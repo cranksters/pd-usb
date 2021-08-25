@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist/",
+    "noImplicitAny": true,
+    "moduleResolution": "node",
+    "module": "esnext",
+    "target": "es5",
+    "lib": [
+      "ES2020",
+      "dom",
+    ],
+    "jsx": "react",
+    "allowJs": false,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "downlevelIteration": true,
+    "paths": {
+      "*" : ["src/types/*"]
+    }
+  }
+}
