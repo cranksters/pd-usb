@@ -1,7 +1,7 @@
 {
   "name": "playdate-usb",
   "version": "1.0.0",
-  "description": "",
+  "description": "JavaScript library for interacting with a Playdate console over USB, wherever webUSB is supported",
   "module": "dist/playdate-usb.es.js",
   "main": "dist/playdate-usb.js",
   "types": "dist/playdate-usb.d.ts",
@@ -32,5 +32,27 @@
     "rollup-plugin-terser": "^7.0.2",
     "rollup-plugin-typescript2": "^0.30.0",
     "typescript": "^4.3.5"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "keywords": [
+    "playdate",
+    "panic",
+    "usb",
+    "webusb",
+    "handheld",
+    "device",
+    "reversing",
+    "reverse-engineering"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaames/playdate-usb.git"
+  },
+  "author": "James Daniel <npm@jamesdaniel.dev>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jaames/playdate-usb/issues"
   }
 }

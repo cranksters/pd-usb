@@ -13,6 +13,13 @@ export class Serial {
   }
 
   /**
+   * Indicates whether the serial is open or close to reading/writing
+   */
+  get isOpen() {
+    return this.device.opened;
+  }
+
+  /**
    * Open the device for communication
    */
   async open() {
@@ -24,8 +31,12 @@ export class Serial {
    * Send a Uint8Array to the USB device
    */
   async write(bytes: Uint8Array) {
+    assert(this.isOpen, 'Serial is not open, please call open() before beginning to write data');
     const outpoint = this.getEndpoint('out');
     const resp = await this.device.transferOut(outpoint.endpointNumber, bytes);
+    if (resp.bytesWritten === 0) {
+      throw `No bytes written`
+    }
     if (resp.status !== 'ok')
       throw `Got status ${ resp.status }`;
     return resp;
@@ -46,6 +57,7 @@ export class Serial {
    * Will keep reading until the device has no more data to give
    */
   async read() {
+    assert(this.isOpen, 'Serial is not open, please call open() before beginning to read data');
     const inpoint = this.getEndpoint('in');
 
     const packets: DataView[] = [];
@@ -123,6 +135,7 @@ export class Serial {
   }
 
   private async getInterface(): Promise<USBInterface> {
+    assert(this.isOpen, 'Serial is not open');
     // set the config to use for the device
     // TODO: check if always selecting config 1 is valid? 
     await this.device.selectConfiguration(1);
@@ -140,11 +153,12 @@ export class Serial {
   }
 
   private getEndpoint(direction: USBDirection) {
-    assertExists(this.interface)
+    assert(this.isOpen, 'Serial is not open');
+    assertExists(this.interface, 'interface');
     // run through interfaces and attempt to find an endpoint matching the requested direction
     const endpoint = this.interface.alternate.endpoints.find(ep => ep.direction == direction);
     if (endpoint === null)
-      throw new Error(`Endpoint ${ direction } not found on device USB interface.`);
+      throw new Error(`${ direction }ward endpoint not found on device USB interface.`);
     return endpoint;
   }
 }

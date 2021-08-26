@@ -82,7 +82,7 @@ module.exports = {
     bundleSize(),
     // devserver + livereload
     devserver && serve({
-      contentBase: ['dist', 'test']
+      contentBase: ['dist', 'examples']
     }),
     devserver && livereload({
       watch: 'dist'
