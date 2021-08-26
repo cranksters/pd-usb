@@ -1,4 +1,4 @@
-import { sleep, assert, assertExists } from './utils';
+import { sleep, assert, assertExists, bytesToString, stringToBytes } from './utils';
 
 /**
  * Handles USB connection and sending data to and fro
@@ -33,22 +33,29 @@ export class Serial {
   async write(bytes: Uint8Array) {
     assert(this.isOpen, 'Serial is not open, please call open() before beginning to write data');
     const outpoint = this.getEndpoint('out');
-    const resp = await this.device.transferOut(outpoint.endpointNumber, bytes);
-    if (resp.bytesWritten === 0) {
-      throw `No bytes written`
+    const packetSize = outpoint.packetSize;
+
+    let ptr = 0;
+    let bytesLeft = bytes.byteLength
+    while (bytesLeft > 0) {
+      const size = Math.min(packetSize, bytesLeft);
+      const packetData = bytes.subarray(ptr, ptr + size);
+      const reply = await this.device.transferOut(outpoint.endpointNumber, packetData);
+      const bytesWritten = reply.bytesWritten;
+      if (reply.status !== 'ok')
+        throw `Write error: got status ${ reply.status }`;
+      if (bytesWritten === 0)
+        throw `Write error: no bytes could be written`;
+      bytesLeft -= bytesWritten;
+      ptr += bytesWritten;
     }
-    if (resp.status !== 'ok')
-      throw `Got status ${ resp.status }`;
-    return resp;
   }
 
   /**
    * Send a string of ascii characters to the USB device
    */
   async writeAscii(str: string) {
-    const bytes = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++)
-      bytes[i] = str.charCodeAt(i);
+    const bytes = stringToBytes(str);
     return await this.write(bytes);
   }
 
@@ -70,12 +77,10 @@ export class Serial {
       const dataSize = packet.data.byteLength;
       if (packet.status === 'ok') {
         // zero-byte packet signals the end of data
-        if (hasStartedToReceiveData && dataSize === 0) {
+        if (hasStartedToReceiveData && dataSize === 0)
           break;
-        }
         // not sure if this is correct, but seems as though if the data starts with zero-byte packet, we need to wait for some to come
         else if (!hasStartedToReceiveData && dataSize === 0) {
-          console.log('waiting');
           await sleep(100);
           continue;
         }
@@ -99,7 +104,7 @@ export class Serial {
       }
     }
 
-    // merge packets into single byte array
+    // merge packets into byte array
     let ptr = 0;
     const bytes = new Uint8Array(responseSize);
     for (let i = 0; i < packets.length; i++) {
@@ -118,11 +123,7 @@ export class Serial {
    */
   async readAscii() {
     const bytes = await this.read();
-    let str = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      str += String.fromCharCode(bytes[i]);
-    }
-    return str;
+    return bytesToString(bytes);
   }
 
   /**
@@ -147,8 +148,8 @@ export class Serial {
     }));
     const result = interfaces.find(claimResult => claimResult.status === 'fulfilled');
     // no interface could be claimed
-    if (!result)
-      new Error(`Unable to establish a USB interface, disconnect the Playdate and try again`);
+    if (result === undefined)
+      throw new Error(`Unable to establish a USB interface, disconnect the Playdate and try again`);
     return (result as PromiseFulfilledResult<USBInterface>).value;
   }
 

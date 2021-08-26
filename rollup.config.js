@@ -16,11 +16,10 @@ const isProdBuild = build === 'production';
 
 const banner = `/*!!
 playdate-usb v${ version }
--
-A JavaScript library for interacting with the Panic Playdate console over USB
+JavaScript library for interacting with a Playdate console over USB
+https://github.com/jaames/playdate-usb
 2021 James Daniel
--
-Playdate is (c) Panic Inc. This project isn't affiliated with or endorsed by them in any way
+Playdate is (c) Panic Inc. - this project isn't affiliated with or endorsed by them in any way
 */`;
 
 module.exports = {

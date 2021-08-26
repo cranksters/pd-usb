@@ -1,7 +1,7 @@
 export * from './PlaydateDevice';
 export * from './Serial';
 
-import { 
+import {
   PlaydateDevice,
   PLAYDATE_VID,
   PLAYDATE_PID,
@@ -22,15 +22,8 @@ export function isUsbSupported() {
  * This does the same thing as isUsbSupported, but will instead throw a useful error message detailing why webUSB isn't supported
  */
 export function assertUsbSupported() {
-  assert(window.isSecureContext, `WebUSB is only supported in secure contexts\nhttps://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts`);
-  assert(navigator.usb !== undefined, `WebUSB is not supported by this browser.\nhttps://developer.mozilla.org/en-US/docs/Web/API/USB#browser_compatibility`);
-}
-
-/**
- * Utility function to detect if a USBDevice is a Playdate, based on its vendor and product IDs
- */
-export function isUsbDevicePlaydate(device: USBDevice) {
-  return device.vendorId === PLAYDATE_VID && device.productId === PLAYDATE_PID;
+  assert(window.isSecureContext, 'WebUSB is only supported in secure contexts\nhttps://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts');
+  assert(navigator.usb !== undefined, 'WebUSB is not supported by this browser.\nhttps://developer.mozilla.org/en-US/docs/Web/API/USB#browser_compatibility');
 }
 
 /**
@@ -50,7 +43,7 @@ export async function getConnectedPlaydates() {
 }
 
 /**
- * Request a connection to a Playdate - the browser will prompt the user to select a device. Will return `null` if no device was found or selected
+ * Request a connection to a Playdate - the browser will prompt the user to select a device. Will return null if no device was found or selected
  */
  export async function requestConnectPlaydate() {
   assertUsbSupported();
@@ -91,6 +84,13 @@ export function onPlaydateDisconnect(fn: (device: PlaydateDevice) => any) {
       fn(new PlaydateDevice(e.device));
     }
   });
+}
+
+/**
+ * Utility function to detect if a USBDevice is a Playdate, based on its vendor and product IDs
+ */
+ export function isUsbDevicePlaydate(device: USBDevice) {
+  return device.vendorId === PLAYDATE_VID && device.productId === PLAYDATE_PID;
 }
 
 /**
