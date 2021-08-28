@@ -4,11 +4,26 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Playdate USB demos</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./playdate-usb.js"></script>
 </head>
 <body>
-  <button onclick="usbInit()">connect</button>
-  <script src="./playdate-usb.js"></script>
-  <script src="./example-basic.js"></script>
+  <div class="wrapper">
+    <header>
+      <h1>Playdate USB demos</h1>
+    </header>
+    <main>
+      <div class="panel">
+        <ul class="example-list">
+          <li>
+            <a href="./example-screen.html">get screenshot</a>
+          </li>
+          <li>
+            <a href="./example-controller.html">read control inputs</a>
+          </li>
+        </ul>
+      </div>
+    </main>
 </body>
 </html>

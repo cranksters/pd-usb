@@ -7,6 +7,8 @@ export class Serial {
 
   device: USBDevice;
   interface: USBInterface;
+  inpoint: USBEndpoint;
+  outpoint: USBEndpoint;
 
   constructor(device: USBDevice) {
     this.device = device;
@@ -25,6 +27,8 @@ export class Serial {
   async open() {
     await this.device.open();
     this.interface = await this.getInterface();
+    this.inpoint = this.getEndpoint('in');
+    this.outpoint = this.getEndpoint('out');
   }
 
   /**
@@ -32,7 +36,7 @@ export class Serial {
    */
   async write(bytes: Uint8Array) {
     assert(this.isOpen, 'Serial is not open, please call open() before beginning to write data');
-    const outpoint = this.getEndpoint('out');
+    const outpoint = this.outpoint;
     const packetSize = outpoint.packetSize;
 
     let ptr = 0;
@@ -65,7 +69,7 @@ export class Serial {
    */
   async read() {
     assert(this.isOpen, 'Serial is not open, please call open() before beginning to read data');
-    const inpoint = this.getEndpoint('in');
+    const inpoint = this.inpoint;
 
     const packets: DataView[] = [];
     let hasStartedToReceiveData = false;
@@ -127,6 +131,16 @@ export class Serial {
   }
 
   /**
+   * Clear in and out endpoints
+   */
+  async clear() {
+    const inpoint = this.inpoint;
+    const outpoint = this.outpoint;
+    this.device.clearHalt('in', inpoint.endpointNumber);
+    this.device.clearHalt('out', outpoint.endpointNumber);
+  }
+
+  /**
    * Close the USB device for communication
    */
   async close() {
@@ -146,20 +160,21 @@ export class Serial {
       await this.device.claimInterface(intf.interfaceNumber);
       return intf;
     }));
+    // find the first interface that was claimable
     const result = interfaces.find(claimResult => claimResult.status === 'fulfilled');
-    // no interface could be claimed
-    if (result === undefined)
-      throw new Error(`Unable to establish a USB interface, disconnect the Playdate and try again`);
-    return (result as PromiseFulfilledResult<USBInterface>).value;
+    if (result)
+      return (result as PromiseFulfilledResult<USBInterface>).value;
+    throw new Error(`Unable to establish a USB interface, disconnect the Playdate and try again`);
   }
 
   private getEndpoint(direction: USBDirection) {
     assert(this.isOpen, 'Serial is not open');
     assertExists(this.interface, 'interface');
+    assert(this.interface.claimed);
     // run through interfaces and attempt to find an endpoint matching the requested direction
     const endpoint = this.interface.alternate.endpoints.find(ep => ep.direction == direction);
-    if (endpoint === null)
-      throw new Error(`${ direction }ward endpoint not found on device USB interface.`);
-    return endpoint;
+    if (endpoint)
+      return endpoint;
+    throw new Error(`${ direction }ward endpoint not found on device USB interface.`);
   }
 }

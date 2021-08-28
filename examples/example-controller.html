@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playdate USB demo - reading controls</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./playdate-usb.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>Playdate USB demo - reading controls</h1>
+    </header>
+    <main>
+      <div class="panel">
+        <div class="row">
+          <div class="pull-left">
+            <button onclick="connect()" id="connectButton"> connect to playdate </button>
+            <span id="serial"></span>
+          </div>
+          <div class="pull-right">
+            <button onclick="start()" id="startButton" disabled> begin polling controls </button>
+            <button onclick="stop()" id="stopButton" disabled> stop polling controls </button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="row row-even">
+          <div>
+            <div>A: <span id="inputA"></span></div>
+            <div>B: <span id="inputB"></span></div>
+            <div>Menu: <span id="inputMenu"></span></div>
+            <div>Lock: <span id="inputLock"></span></div>
+          </div>
+          <div>
+            <div>Up: <span id="inputUp"></span></div>
+            <div>Down: <span id="inputDown"></span></div>
+            <div>Left: <span id="inputLeft"></span></div>
+            <div>Right: <span id="inputRight"></span></div>
+          </div>
+          <div>
+            <div>Crank: <span id="inputCrank"></span></div>
+            <div>Docked: <span id="inputDocked"></span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer class="row">
+      <div class="pull-left">
+        <a href="//github.com/jaames/playdate-usb">playdate-usb</a> | <a href="//github.com/jaames/playdate-usb/blob/main/examples/example-controller.html">page source</a>
+      </div>
+      <div class="pull-right">
+        built by <a href="//github.com/jaames">james daniel</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    var device;
+
+    const inputA = document.getElementById('inputA');
+    const inputB = document.getElementById('inputB');
+    const inputMenu = document.getElementById('inputMenu');
+    const inputLock = document.getElementById('inputLock');
+    const inputUp = document.getElementById('inputUp');
+    const inputDown = document.getElementById('inputDown');
+    const inputLeft = document.getElementById('inputLeft');
+    const inputRight = document.getElementById('inputRight');
+    const inputCrank = document.getElementById('inputCrank');
+    const inputDocked = document.getElementById('inputDocked');
+
+    // Check WebUSB support, display error if not supported
+    try {
+      playdateUsb.assertUsbSupported();
+    }
+    catch (e) {
+      document.getElementById('serial').innerHTML = e.message;
+      document.getElementById('connectButton').disabled = true;
+    }
+
+    async function connect() {
+      device = await playdateUsb.requestConnectPlaydate();
+      try {
+        await device.open();
+
+        device.on('controls:update', handleControlUpdate);
+        const serial = await device.getSerial();
+
+        document.getElementById('serial').innerHTML = `Connected to Playdate ${ serial }`;
+        document.getElementById('startButton').disabled = false;
+
+        device.on('disconnect', () => {
+          document.getElementById('serial').innerHTML = `Playdate disconnected`;
+          document.getElementById('startButton').disabled = true;
+          document.getElementById('stopButton').disabled = true;
+        });
+      }
+      catch {
+        document.getElementById('serial').innerHTML = 'Error connecting to Playdate, try again'
+      }
+    }
+
+    async function start() {
+      document.getElementById('startButton').disabled = true;
+      document.getElementById('stopButton').disabled = false;
+      device.startPollingControls();
+    }
+
+    async function stop() {
+      await device.stopPollingControls();
+      document.getElementById('startButton').disabled = false;
+      document.getElementById('stopButton').disabled = true;
+    }
+
+    function handleControlUpdate(state) {
+      inputCrank.innerHTML = state.crank;
+      inputDocked.innerHTML = state.crankDocked;
+
+      inputA.innerHTML = state.button.a ? 'pressed' : '';
+      inputB.innerHTML = state.button.b ? 'pressed' : '';
+      inputMenu.innerHTML = state.button.menu ? 'pressed' : '';
+      inputLock.innerHTML = state.button.lock ? 'pressed' : '';
+      inputUp.innerHTML = state.button.up ? 'pressed' : '';
+      inputDown.innerHTML = state.button.down ? 'pressed' : '';
+      inputLeft.innerHTML = state.button.left ? 'pressed' : '';
+      inputRight.innerHTML = state.button.right ? 'pressed' : '';
+    }
+  </script>
+</body>
+</html>

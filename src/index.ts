@@ -1,12 +1,8 @@
 export * from './PlaydateDevice';
+export * from './PlaydateTypes';
 export * from './Serial';
 
-import {
-  PlaydateDevice,
-  PLAYDATE_VID,
-  PLAYDATE_PID,
-} from './PlaydateDevice';
-
+import { PlaydateDevice, PLAYDATE_VID, PLAYDATE_PID } from './PlaydateDevice';
 import { assert } from './utils';
 
 /**
@@ -27,70 +23,19 @@ export function assertUsbSupported() {
 }
 
 /**
- * Attempt to find Playdates that are already paired via USB. Will return an array of PlaydateDevice objects
- */
-export async function getConnectedPlaydates() {
-  assertUsbSupported();
-  try {
-    const devices = await navigator.usb.getDevices();
-    return devices
-      .filter(isUsbDevicePlaydate)
-      .map(device => new PlaydateDevice(device));
-  }
-  catch(e) {
-    return [];
-  }
-}
-
-/**
  * Request a connection to a Playdate - the browser will prompt the user to select a device. Will return null if no device was found or selected
  */
- export async function requestConnectPlaydate() {
+ export async function requestConnectPlaydate(): Promise<PlaydateDevice | null> {
   assertUsbSupported();
   try {
     const device = await navigator.usb.requestDevice({
       filters: [{vendorId: PLAYDATE_VID, productId: PLAYDATE_PID }]
     });
-    return new PlaydateDevice(device);
+    return  new PlaydateDevice(device);
   }
   catch(e) {
     return null;
   }
-}
-
-/**
- * Call a function whenever a paired Playdate device is connected
- * This will not detect Playdates that haven't been paired yet
- * @param fn 
- */
-export function onPlaydateConnected(fn: (device: PlaydateDevice) => any) {
-  assertUsbSupported();
-  navigator.usb.addEventListener('connect', (e) => {
-    if (isUsbDevicePlaydate(e.device)) {
-      fn(new PlaydateDevice(e.device));
-    }
-  });
-}
-
-/**
- * Call a function whenever a paired Playdate device is disconnected
- * This will not detect Playdates that haven't been paired yet
- * @param fn 
- */
-export function onPlaydateDisconnect(fn: (device: PlaydateDevice) => any) {
-  assertUsbSupported();
-  navigator.usb.addEventListener('disconnect', (e) => {
-    if (isUsbDevicePlaydate(e.device)) {
-      fn(new PlaydateDevice(e.device));
-    }
-  });
-}
-
-/**
- * Utility function to detect if a USBDevice is a Playdate, based on its vendor and product IDs
- */
- export function isUsbDevicePlaydate(device: USBDevice) {
-  return device.vendorId === PLAYDATE_VID && device.productId === PLAYDATE_PID;
 }
 
 /**

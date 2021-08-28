@@ -1,6 +1,10 @@
 # Debug stuff
 playdate_usb_captures
 
+# lockfiles not needed for library
+yarn.lock
+package-lock.json
+
 # Logs
 logs
 *.log

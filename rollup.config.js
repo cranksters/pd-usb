@@ -71,7 +71,7 @@ module.exports = {
             if (isEsmoduleBuild)
               return 'es2020';
             else
-              return 'es5';
+              return 'es6';
           })(),
           declaration: !devserver ? true : false,
           sourceMap: devserver ? true : false,

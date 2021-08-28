@@ -4,11 +4,12 @@ JavaScript library for interacting with a [Playdate](http://play.date/) console 
 
 ## Features
 
- - Get Playdate device stats such as its version info, serial, cpu stats, memory usage, etc!
- - Take a screenshot of the Playdate screen and draw it to a HTML5 canvas! Or send an image to be previewed on the Playdate screen!
- - Execute secret commands on your Playdate over USB!
- - Extensive error handling with helpful error messages!
- - Exports full Typescript types, has zero dependencies, and only ~4kb minified and gzipped!
+ - Get Playdate device stats such as its version info, serial, cpu stats, memory usage, etc
+ - Take a screenshot of the Playdate's screen and draw it to a HTML5 canvas, or send an image to be previewed
+ - Read the Playdate's button and crank input state
+ - Execute secret commands!
+ - Extensive error handling with helpful error messages
+ - Exports full Typescript types, has zero dependencies, and only ~4kb minified and gzipped
 
 ## Notes
 
@@ -27,7 +28,7 @@ TODO
 ### With NPM
 
 ```shell
-  npm install playdate-usb --save
+npm install playdate-usb --save
 ```
 
 Then assuming you're using a module-compatible system (like Webpack, Rollup, etc):

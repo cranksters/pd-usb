@@ -15,7 +15,6 @@
     "build:es": "rollup -c --environment ES_MODULE,BUILD:production"
   },
   "devDependencies": {
-    "@types/w3c-web-usb": "^1.0.5",
     "@babel/core": "^7.0.0-0",
     "@babel/preset-env": "^7.15.0",
     "@babel/preset-react": "^7.14.5",
@@ -23,6 +22,8 @@
     "@rollup/plugin-commonjs": "^20.0.0",
     "@rollup/plugin-node-resolve": "^13.0.4",
     "@rollup/plugin-replace": "^3.0.0",
+    "@types/node": "^16.7.2",
+    "@types/w3c-web-usb": "^1.0.5",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "rollup": "^2.56.3",
     "rollup-plugin-bundle-size": "^1.0.3",
