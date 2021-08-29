@@ -1,6 +1,21 @@
 import { Serial } from './Serial';
-import { PlaydateButtonBitmask, PlaydateButton, PlaydateButtonState, PlaydateVersion, PlaydateControlState } from './PlaydateTypes';
-import { warn, assert, splitLines, parseKeyVal, bytesToString, stringToBytes } from './utils';
+
+import {
+  PlaydateVersion,
+  PlaydateButton,
+  PlaydateButtonBitmask,
+  PlaydateButtonState,
+  PlaydateControlState
+} from './PlaydateTypes';
+
+import {
+  assert,
+  splitLines,
+  parseKeyVal,
+  bytesToString,
+  stringToBytes
+} from './utils';
+
 // Playdate USB vendor and product IDs
 export const PLAYDATE_VID = 0x1331;
 export const PLAYDATE_PID = 0x5740;
@@ -36,6 +51,7 @@ export class PlaydateDevice {
 
   isConnected: boolean =  true;
   isPollingControls: boolean = false;
+  isStreaming: boolean = false;
   lastControlState: PlaydateControlState;
 
   logCommandResponse: boolean = false;
@@ -65,7 +81,7 @@ export class PlaydateDevice {
    * Indicates when the Playdate is busy and not able to handle other commands
    */
   get isBusy() {
-    return this.isPollingControls;
+    return this.isPollingControls || this.isStreaming;
   }
 
   /**
@@ -97,8 +113,7 @@ export class PlaydateDevice {
    */
   async open() {
     await this.serial.open();
-    // seems to help if the last session goofed up and the device is still trying to send data
-    await this.serial.clear();
+    await this.forceInputClear();
     // we want echo to be off by default (playdate simulator does this first)
     await this.setEcho('off');
     this.emit('open');
@@ -230,7 +245,7 @@ export class PlaydateDevice {
       for (let shift = 0; shift < 8; shift++) {
         // if the current pixel isn't 0, flip the current bit to 1
         if (indexed[srcPtr++] !== 0)
-          chunk |= (0x1 << shift);
+          chunk |= (0x80 >> shift);
       }
       bitmap[dstPtr++] = chunk;
     }
@@ -298,39 +313,32 @@ export class PlaydateDevice {
     assert(str === '\r\n', `Invalid run response, got ${ str }`);
   }
 
-  /**
-   * Capture a screenshot from the Playdate, and get the unpacked RGBA framebuffer
-   * This will return an 32-bit indexed framebuffer as an Uint32Array. Each element of the array will represent the RGBA color of a single pixel
-   * The framebuffer is 400 x 240 pixels
-   */
-  async getScreenRgba(palette = [0x000000FF, 0xFFFFFFFF]) {
-    const indexed = await this.getScreenIndexed();
-    const rgba = new Uint32Array(indexed.length);
-    // lookup each pixel's RGBA color using the palette
-    for (let i = 0; i < indexed.length; i++)
-      rgba[i] = palette[indexed[i]];
-    return rgba;
-  }
+  // not quite working yet
+  // async startStreaming() {
+  //   this.assertNotBusy();
+  //   await this.serial.writeAscii('stream enable\n');
+  //   // this.emit('stream:start');
+  //   const r = await this.serial.read();
+  //   console.log('r');
+  //   const firstFrame = await this.serial.read();
+  //   console.log('first frame', firstFrame);
+  //   this.isStreaming = true;
+  //   while (this.isStreaming) {
+  //     await this.serial.writeAscii('stream poke\n');
+  //     const frame = await this.serial.read();
+  //     console.log('new frame', frame);
+  //   }
+  //   // this.emit('stream:stop');
+  //   return true;
+  // }
 
-  // TODO: simplify palette to either black+white or approximated grey colors
-  async drawScreenToCanvas(ctx: CanvasRenderingContext2D, palette = [0xFF000000, 0xFFFFFFFF]) {
-    const indexed = await this.getScreenIndexed();
-    const imgData = ctx.createImageData(PLAYDATE_WIDTH, PLAYDATE_HEIGHT);
-    const rgba = new Uint32Array(imgData.data.buffer);
-    for (let i = 0; i < indexed.length; i++)
-      rgba[i] = palette[indexed[i]];
-    ctx.putImageData(imgData, 0, 0);
-  }
-
-  // TODO: remove
-  async screenDebug() {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = PLAYDATE_WIDTH;
-    canvas.height = PLAYDATE_HEIGHT;
-    await this.drawScreenToCanvas(ctx);
-    document.body.appendChild(canvas);
-  }
+  // async stopStreaming() {
+  //   this.isStreaming = false;
+  //   await this.serial.writeAscii('stream disable\n');
+  //   const str = await this.serial.readAscii();
+  //   assert(str === '\r\n');
+  //   await this.serial.clear();
+  // }
 
   /**
    * Send a custom USB command to the device
@@ -345,6 +353,18 @@ export class PlaydateDevice {
       console.log(lines.join('\n'));
     }
     return str;
+  }
+
+  /**
+   * This will clear out the input buffer if the device was still in button/streaming mode or wasn't properly closed
+   */
+  async forceInputClear() {
+    while (true) {
+      await this.serial.writeAscii('\n'); // newline cancels button/streaming mode
+      const str = await this.serial.readAscii();
+      if (str.includes('Unknown command'))
+        break;
+    }
   }
 
   /**

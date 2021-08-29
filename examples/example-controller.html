@@ -81,8 +81,9 @@
     }
 
     async function connect() {
-      device = await playdateUsb.requestConnectPlaydate();
       try {
+        device = await playdateUsb.requestConnectPlaydate();
+        
         await device.open();
 
         device.on('controls:update', handleControlUpdate);

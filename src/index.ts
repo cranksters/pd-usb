@@ -23,19 +23,14 @@ export function assertUsbSupported() {
 }
 
 /**
- * Request a connection to a Playdate - the browser will prompt the user to select a device. Will return null if no device was found or selected
+ * Request a connection to a Playdate - the browser will prompt the user to select a device. Will throw an error if no device was found or selected
  */
  export async function requestConnectPlaydate(): Promise<PlaydateDevice | null> {
   assertUsbSupported();
-  try {
-    const device = await navigator.usb.requestDevice({
-      filters: [{vendorId: PLAYDATE_VID, productId: PLAYDATE_PID }]
-    });
-    return  new PlaydateDevice(device);
-  }
-  catch(e) {
-    return null;
-  }
+  const device = await navigator.usb.requestDevice({
+    filters: [{vendorId: PLAYDATE_VID, productId: PLAYDATE_PID }]
+  });
+  return new PlaydateDevice(device);
 }
 
 /**
