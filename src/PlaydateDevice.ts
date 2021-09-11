@@ -272,7 +272,7 @@ export class PlaydateDevice {
         }
       }
       catch(e) {
-        // if isButtonMode is false, that means stopButtonInput() was called, 
+        // if isPollingControls is false, that means stopPollingControls() was called, 
         // and we can ignore this error because it cancels any ongoing transfers
         // if it's still true, it means something actually went wrong
         if (this.isPollingControls)

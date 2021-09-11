@@ -62,9 +62,6 @@
     async function connect() {
       try {
         device = await playdateUsb.requestConnectPlaydate();
-        
-        if (device == null)
-          throw new Error('Could not find playdate')
           
         await device.open();
         const serial = await device.getSerial();
