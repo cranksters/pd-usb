@@ -13,7 +13,8 @@ import {
   splitLines,
   parseKeyVal,
   bytesToString,
-  stringToBytes
+  stringToBytes,
+  sleep
 } from './utils';
 
 // Playdate USB vendor and product IDs
@@ -333,6 +334,19 @@ export class PlaydateDevice {
     assert(str === '\r\n', `Invalid run response, got ${ str }`);
   }
 
+  /**
+   * Eval a pre-compiled lua function payload (has to be compiled with pdc) on the device
+   */
+  async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
+    const cmd = `eval ${ payload.byteLength }\n`;
+    const data = new Uint8Array(cmd.length + payload.byteLength);
+    data.set(stringToBytes(cmd), 0);
+    data.set(new Uint8Array(payload), cmd.length);
+    await this.serial.write(data);
+    await sleep(waitTime);
+    return await this.serial.readAscii();
+  }
+
   // not quite working yet
   // async startStreaming() {
   //   this.assertNotBusy();
@@ -450,7 +464,7 @@ export class PlaydateDevice {
   //     console.log(str);
   //     if (str.includes('OK') || str.includes('ERROR'))
   //       break;
-  //     sleep(100);
+  //     await sleep(100);
   //     i++;
   //   }
   // }

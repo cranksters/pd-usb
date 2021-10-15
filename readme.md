@@ -5,9 +5,10 @@ JavaScript library for interacting with a [Panic Playdate](http://play.date/) co
 ## Features
 
  - Get Playdate device stats such as its version info, serial, cpu stats, etc
- - Take a screenshot of the Playdate's screen and draw it to a HTML5 canvas, or send an image to be previewed
- - Read the Playdate's button and crank input state
+ - Grab a screenshot from the Playdate and draw it to a HTML5 canvas, or send an image to be previewed on the device
+ - Read the button and crank input state
  - Execute secret commands!
+ - Send compiled Lua payloads over USB!
  - Extensive error handling with helpful error messages
  - Exports full Typescript types, has zero dependencies, and weighs less than 4kb minified and gzipped
 
@@ -214,7 +215,7 @@ const screenBuffer = new Uint8Array(12000);
 await device.sendBitmap(screenBuffer);
 ```
 
-#### `sendBitmapIndexed(pixiels: Uint8Array)`
+#### `sendBitmapIndexed(pixels: Uint8Array)`
 
 Send a indexed bitmap to display on the Playdate's screen. The input bitmap must be an [Uint8Array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) of bytes, each byte in the array will represent 1 pixel; `0x0` for black, `0x1` for white. The input bitmap must also contain 400 x 240 pixels.
 
@@ -286,6 +287,17 @@ Sends a plaintext command directly to the Playdate, and returns the response as 
 
 > ⚠️ The commands that this library wraps with functions (such as `getVersion()` or `getScreen()`) are known to be safe, are used by the Playdate Simulator, and have all been tested on actual Playdate hardware. However, some of the commands that you can potentially run with `sendCommand()` could be dangerous, and might even harm your favorite yellow handheld if you don't know what you're doing. *Please* don't execute any commands that you're unsure about!
 
+#### `evalLuaPayload()`
+
+Sends a compiled Lua function to the device to be evaluated. The payload must be a Playdate-compatible Lua function compiled with [`luaU_dump()`](https://github.com/lua/lua/blob/v5.4-alpha/ldump.c#L215) from luac. It will return anything printed to the device's console.
+
+> ⚠️ This is pretty hardcore, you're probably not going to find this useable unless you really know what you're doing. 
+
+```js
+const payloadData = new Uint8Array(... put your payload data here);
+await device.evalLuaPayload(payloadData);
+```
+
 ## Contributing
 
 Contributions and ports to other languages are welcome! Here's a list of things I'd like to do, but haven't found the time yet:
@@ -315,6 +327,6 @@ To build the project, you'll need to have Node and NPM installed. Clone the repo
 
 2021 James Daniel
 
-If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rakujira)), on Discord (`@jaames#9860`), or via email (`mail at jamesdaniel dot dev`). I'm interested in joining any groups that are working on Playdate reverse-engineering!
+If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rakujira)), on Discord (`@jaames#9860`), or via email (`mail at jamesdaniel dot dev`).
 
 Playdate is © [Panic Inc.](https://panic.com/) This project isn't affiliated with or endorsed by them in any way
