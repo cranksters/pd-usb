@@ -82,7 +82,7 @@ if (!isUsbSupported) {
 }
 ```
 
-### Connecting a Playdate
+### Connecting to a Playdate
 
 Next we want to actually connect to a Playdate. Calling `requestConnectPlaydate()` will prompt the user to select a Playdate device from a menu, and returns a [Promise](https://web.dev/promises/) that will resolve a `PlaydateDevice` object if the connection was successful, or reject if a connection could not be made.
 
@@ -160,7 +160,7 @@ These methods are asynchronous and will resolve when a response has been receive
 
 #### `getVersion()`
 
-Returns an object containing version information about the Playdate, such as its OS build info, SDK version, serial number, etc
+Returns an object containing version information about the Playdate, such as its OS build info, SDK version, serial number, etc.
 
 ```js
 const version = await device.getVersion();
@@ -173,6 +173,16 @@ Returns the Playdate's serial number as a string, useful for if you need the use
 ```js
 const serial = await device.getSerial();
 ```
+
+#### `getConsoleOutput()`
+
+Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string.
+
+```js
+const consoleOutput = await device.getConsoleOutput();
+```
+
+Alternatively, you can use` getRawConsoleOutput()` to get the console output as an Uint8Array of bytes, if for example you have printed binary data to the console.
 
 #### `getScreen()`
 
@@ -305,6 +315,6 @@ To build the project, you'll need to have Node and NPM installed. Clone the repo
 
 2021 James Daniel
 
-If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rakujira)), on Discord (`@jaames#9860`), or via email (`mail at jamesdaniel dot dev`). I'm interested in joining any groups that are working on Playdate reverse-engineering.
+If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rakujira)), on Discord (`@jaames#9860`), or via email (`mail at jamesdaniel dot dev`). I'm interested in joining any groups that are working on Playdate reverse-engineering!
 
 Playdate is © [Panic Inc.](https://panic.com/) This project isn't affiliated with or endorsed by them in any way

@@ -175,8 +175,28 @@ export class PlaydateDevice {
   }
 
   /**
+   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string
+   */
+  async getConsoleOutput() {
+    const str = await this.sendCommand('eval');
+    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
+    return str.trim();
+  }
+
+  /**
+   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as an Uint8Array of bytes
+   */
+  async getRawConsoleOutput() {
+    await this.serial.writeAscii('eval\n');
+    const bytes = await this.serial.read();
+    const str = bytesToString(bytes.subarray(0, 40));
+    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
+    return bytes;
+  }
+
+  /**
    * Capture a screenshot from the Playdate, and get the raw framebuffer
-   * This will return the 1-bit framebuffer data as Uint8Array of bytes, where each bit in the byte will represent 1 pixel; `0` for black, `1` for white.
+   * This will return the 1-bit framebuffer data as an Uint8Array of bytes, where each bit in the byte will represent 1 pixel; `0` for black, `1` for white
    * The framebuffer is 400 x 240 pixels
    */
   async getScreen() {
@@ -192,7 +212,7 @@ export class PlaydateDevice {
 
   /**
    * Capture a screenshot from the Playdate, and get the unpacked framebuffer
-   * This will return an 8-bit indexed framebuffer as an Uint8Array. Each element of the array will represent a single pixel; `0x0` for black, `0x1` for white
+   * This will return an 8-bit indexed framebuffer as an Uint8Array of pixels. Each element of the array will represent a single pixel; `0x0` for black, `0x1` for white
    * The framebuffer is 400 x 240 pixels
    */
   async getScreenIndexed() {
