@@ -159,7 +159,7 @@ The following events are available:
 
 These methods are asynchronous and will resolve when a response has been received from the Playdate, so you need to remember to use `async/await`.
 
-#### `getVersion()`
+#### `getVersion`
 
 Returns an object containing version information about the Playdate, such as its OS build info, SDK version, serial number, etc.
 
@@ -167,7 +167,7 @@ Returns an object containing version information about the Playdate, such as its
 const version = await device.getVersion();
 ```
 
-#### `getSerial()`
+#### `getSerial`
 
 Returns the Playdate's serial number as a string, useful for if you need the user to be able to identify the connected device.
 
@@ -175,7 +175,7 @@ Returns the Playdate's serial number as a string, useful for if you need the use
 const serial = await device.getSerial();
 ```
 
-#### `getConsoleOutput()`
+#### `getConsoleOutput`
 
 Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string.
 
@@ -185,7 +185,7 @@ const consoleOutput = await device.getConsoleOutput();
 
 Alternatively, you can use` getRawConsoleOutput()` to get the console output as an Uint8Array of bytes, if for example you have printed binary data to the console.
 
-#### `getScreen()`
+#### `getScreen`
 
 Capture a screenshot from the Playdate, and get the raw framebuffer. This will return the 1-bit framebuffer data as [Uint8Array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) of bytes, where each bit in the byte will represent 1 pixel; `0` for black, `1` for white. The framebuffer is 400 x 240 pixels
 
@@ -193,7 +193,7 @@ Capture a screenshot from the Playdate, and get the raw framebuffer. This will r
 const screenBuffer = await device.getScreen();
 ```
 
-#### `getScreenIndexed()`
+#### `getScreenIndexed`
 
 Capture a screenshot from the Playdate, and get the unpacked framebuffer. This will return an 8-bit indexed framebuffer as an [Uint8Array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array). Each element of the array will represent a single pixel; `0x0` for black, `0x1` for white. The framebuffer is 400 x 240 pixels.
 
@@ -203,7 +203,7 @@ const screenPixels = await device.getScreenIndexed();
 
 If you want to draw the screen to a HTML5 canvas, check out the [screen example](https://github.com/jaames/playdate-usb/blob/main/examples/example-screen.html).
 
-#### `sendBitmap(bitmap: Uint8Array)`
+#### `sendBitmap`
 
 Send a 1-bit bitmap buffer to display on the Playdate's screen. The input bitmap must be an [Uint8Array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) of bytes, where each bit in the byte will represent 1 pixel; `0` for black, `1` for white. The input bitmap must also contain 400 x 240 pixels.
 
@@ -215,7 +215,7 @@ const screenBuffer = new Uint8Array(12000);
 await device.sendBitmap(screenBuffer);
 ```
 
-#### `sendBitmapIndexed(pixels: Uint8Array)`
+#### `sendBitmapIndexed`
 
 Send a indexed bitmap to display on the Playdate's screen. The input bitmap must be an [Uint8Array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) of bytes, each byte in the array will represent 1 pixel; `0x0` for black, `0x1` for white. The input bitmap must also contain 400 x 240 pixels.
 
@@ -229,7 +229,7 @@ await device.sendBitmapIndexed(pixels);
 
 If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap example](https://github.com/jaames/playdate-usb/blob/main/examples/example-bitmap.html).
 
-#### `run(path: string)`
+#### `run`
 
 Launch a .pdx rom at a given path on the Playdate's data disk. The path must begin with a forward slash, and the device may crash if the selected rom does not exist.
 
@@ -237,7 +237,7 @@ Launch a .pdx rom at a given path on the Playdate's data disk. The path must beg
 await device.run('/System/Crayons.pdx');
 ```
 
-#### `startPollingControls()`
+#### `startPollingControls`
 
 Begin polling the device for control updates. Can be stopped with `stopPollingControls()`. While control polling is active, you won't be able to communicate with the device. The `controls:update` event will be fired whenever the control state changes.
 
@@ -258,7 +258,7 @@ This method will resolve only when control polling is stopped, so you probably d
 
 Please also note that disconnecting your Playdate while control polling is active can sometimes cause future USB connections to goof up for a while. This library has code that tries to fix this by clearing the input buffer, but it doesn't seem to be perfect. If this happens, try locking and unlocking your device a few times!
 
-#### `getControls()`
+#### `getControls`
 
 Returns the current control state, while control polling is active. Note that this method is *not* asynchronous.
 
@@ -273,7 +273,7 @@ console.log('Crank angle:', state.crank);
 await device.stopPollingControls();
 ```
 
-#### `stopPollingControls()`
+#### `stopPollingControls`
 
 Stop polling for control updates, after startPollingControls() has been called. After this has completed, you'll be able to communicate with the device again.
 
@@ -281,13 +281,13 @@ Stop polling for control updates, after startPollingControls() has been called. 
 await device.stopPollingControls();
 ```
 
-#### `sendCommand()`
+#### `sendCommand`
 
 Sends a plaintext command directly to the Playdate, and returns the response as a string. You can use `await sendCommand('help')` to get a list of all available commands.
 
 > ⚠️ The commands that this library wraps with functions (such as `getVersion()` or `getScreen()`) are known to be safe, are used by the Playdate Simulator, and have all been tested on actual Playdate hardware. However, some of the commands that you can potentially run with `sendCommand()` could be dangerous, and might even harm your favorite yellow handheld if you don't know what you're doing. *Please* don't execute any commands that you're unsure about!
 
-#### `evalLuaPayload()`
+#### `evalLuaPayload`
 
 Sends a compiled Lua function to the device to be evaluated. The payload must be a Playdate-compatible Lua function compiled with [`luaU_dump()`](https://github.com/lua/lua/blob/v5.4-alpha/ldump.c#L215) from luac. It will return anything printed to the device's console.
 
