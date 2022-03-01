@@ -15,10 +15,10 @@ const isEsmoduleBuild = process.env.ES_MODULE || false;
 const isProdBuild = build === 'production';
 
 const banner = `/*!!
-playdate-usb v${ version }
+pd-usb v${ version }
 JavaScript library for interacting with a Panic Playdate console over USB
-https://github.com/jaames/playdate-usb
-2021 James Daniel
+https://github.com/jaames/pd-usb
+2022 James Daniel
 Playdate is (c) Panic Inc. - this project isn't affiliated with or endorsed by them in any way
 */`;
 
@@ -28,22 +28,22 @@ module.exports = {
   ],
   output: [
     (isEsmoduleBuild) && {
-      file: 'dist/playdate-usb.es.js',
+      file: 'dist/pd-usb.es.js',
       format: 'es',
       name: 'playdateUsb',
       exports: 'named',
       banner: banner,
       sourcemap: devserver ? true : false,
-      sourcemapFile: 'dist/playdate-usb.es.map'
+      sourcemapFile: 'dist/pd-usb.es.map'
     },
     (!isEsmoduleBuild) && {
-      file: isProdBuild ? 'dist/playdate-usb.min.js' : 'dist/playdate-usb.js',
+      file: isProdBuild ? 'dist/pd-usb.min.js' : 'dist/pd-usb.js',
       format: 'umd',
       name: 'playdateUsb',
       exports: 'named',
       banner: banner,
       sourcemap: devserver ? true : false,
-      sourcemapFile: isProdBuild ? 'dist/playdate-usb.min.js.map' : 'dist/playdate-usb.js.map'
+      sourcemapFile: isProdBuild ? 'dist/pd-usb.min.js.map' : 'dist/pd-usb.js.map'
     },
   ].filter(Boolean),
   plugins: [
