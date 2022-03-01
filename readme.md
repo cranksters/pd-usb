@@ -2,7 +2,7 @@
 
 JavaScript library for interacting with a [Panic Playdate](http://play.date/) console over USB, wherever [WebUSB](https://web.dev/usb/) is supported.
 
-> ⚠️ This library is unofficial and is not affiliated with Panic. Details on the USB protocol were gleaned from reverse-engineering and packet sniffing.
+> ⚠️ This library is unofficial and is not affiliated with Panic. Details on the USB protocol were gleaned from reverse-engineering and packet sniffing. Things may be incorrect.
 
 ## Features
 

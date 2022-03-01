@@ -1,10 +1,10 @@
 {
-  "name": "playdate-usb",
+  "name": "pd-usb",
   "version": "1.0.0",
-  "description": "JavaScript library for interacting with a Playdate console over USB, wherever webUSB is supported",
-  "module": "dist/playdate-usb.es.js",
-  "main": "dist/playdate-usb.js",
-  "types": "dist/playdate-usb.d.ts",
+  "description": "JavaScript library for interacting with a Playdate console over USB, wherever webUSB is supported. Not officially supported by or affiliated with Panic.",
+  "module": "dist/pd-usb.es.js",
+  "main": "dist/pd-usb.js",
+  "types": "dist/pd-usb.d.ts",
   "scripts": {
     "prepublishOnly": "npm run build",
     "postpublish": "./deploy.sh",
@@ -39,7 +39,6 @@
   ],
   "keywords": [
     "playdate",
-    "panic",
     "usb",
     "webusb",
     "handheld",
@@ -49,11 +48,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jaames/playdate-usb.git"
+    "url": "git+https://github.com/jaames/pd-usb.git"
   },
   "author": "James Daniel <npm@jamesdaniel.dev>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/jaames/playdate-usb/issues"
+    "url": "https://github.com/jaames/pd-usb/issues"
   }
 }
