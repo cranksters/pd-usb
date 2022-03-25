@@ -1,7 +1,7 @@
 import { assert } from './assert';
 
 /**
- * Webpack tries to replace inline calles to require() with polyfills, 
+ * Webpack tries to replace inline calls to require() with polyfills, 
  * but we don't want that, since we only use require to add extra features in NodeJs environments
  * 
  * Modified from:

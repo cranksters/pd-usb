@@ -1,4 +1,4 @@
-import { Serial } from './Serial';
+import { PDSerial } from './Serial';
 
 import {
   PlaydateVersion,
@@ -10,16 +10,21 @@ import {
 
 import {
   assert,
-  splitLines,
   parseKeyVal,
   bytesToString,
   stringToBytes,
-  sleep
+  bytesPos,
 } from './utils';
 
 // Playdate USB vendor and product IDs
 export const PLAYDATE_VID = 0x1331;
 export const PLAYDATE_PID = 0x5740;
+
+export const USB_FILTER = { usbVendorId: PLAYDATE_VID, usbProductId: PLAYDATE_PID };
+
+// Serial settings
+export const PLAYDATE_BAUDRATE = 115200;
+export const PLAYDATE_BUFFER_SIZE = 12800;
 
 // Playdate screen dimensions
 export const PLAYDATE_WIDTH = 400;
@@ -47,8 +52,8 @@ export type PlaydateEventCallback<T extends any[] = []> = (...args: T) => void;
  */
 export class PlaydateDevice {
 
-  device: USBDevice;
-  serial: Serial;
+  port: SerialPort;
+  serial: PDSerial;
 
   isConnected: boolean =  true;
   isPollingControls: boolean = false;
@@ -59,16 +64,28 @@ export class PlaydateDevice {
 
   events: Partial<Record<PlaydateEvent, PlaydateEventCallback[]>> = {};
 
-  constructor(device: USBDevice) {
-    this.device = device;
-    this.serial = new Serial(device);
-    // watch for when this device disconnects
-    navigator.usb.addEventListener('disconnect', async (e) => {
-      if (e.device === this.device) {
-        this.isConnected = false;
-        this.emit('disconnect');
-      }
+
+  constructor(port: SerialPort) {
+    this.port = port;
+    this.serial = new PDSerial(port, {
+      baudRate: PLAYDATE_BAUDRATE,
+      bufferSize: PLAYDATE_BUFFER_SIZE
     });
+  }
+
+  static async requestDevice() {
+    const port = await navigator.serial.requestPort({ filters: [USB_FILTER] });
+    return new PlaydateDevice(port);
+  }
+
+  static async getDevices() {
+    const ports = await navigator.serial.getPorts();
+    return ports
+      .filter(port => {
+        const { usbProductId, usbVendorId } = port.getInfo();
+        return usbProductId === PLAYDATE_PID && usbVendorId === PLAYDATE_VID;
+      })
+      .map(port => new PlaydateDevice(port));
   }
 
   /**
@@ -114,7 +131,6 @@ export class PlaydateDevice {
    */
   async open() {
     await this.serial.open();
-    await this.forceInputClear();
     // we want echo to be off by default (playdate simulator does this first)
     await this.setEcho('off');
     this.emit('open');
@@ -125,7 +141,7 @@ export class PlaydateDevice {
    */
   async close() {
     // seems to help if the session goofed up and the device is still trying to send data
-    await this.serial.clear();
+    // await this.serial.clear();
     // stop any continually running commands
     if (this.isPollingControls)
       await this.stopPollingControls();
@@ -138,8 +154,7 @@ export class PlaydateDevice {
    * Get version information about the Playdate; its OS build info, SDK version, serial number, etc 
    */
   async getVersion(): Promise<PlaydateVersion> {
-    const str = await this.sendCommand('version');
-    const lines = splitLines(str);
+    const lines = await this.sendCommand('version');
     const parsed: Record<string, string> = {};
     // split key=value lines into object
     lines.forEach(line => {
@@ -171,29 +186,20 @@ export class PlaydateDevice {
    * Get the Playdate's serial number
    */
   async getSerial() {
-    const str = await this.sendCommand('serialread');
-    return str.trim();
-  }
-
-  /**
-   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string
-   */
-  async getConsoleOutput() {
-    const str = await this.sendCommand('eval');
-    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
-    return str.trim();
+    const lines = await this.sendCommand('serialread');
+    return lines.find(line => line !== '');
   }
 
   /**
    * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as an Uint8Array of bytes
    */
-  async getRawConsoleOutput() {
-    await this.serial.writeAscii('eval\n');
-    const bytes = await this.serial.read();
-    const str = bytesToString(bytes.subarray(0, 40));
-    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
-    return bytes;
-  }
+  // async getRawConsoleOutput() {
+  //   await this.serial.writeAscii('eval\n');
+  //   const bytes = await this.serial.read();
+  //   const str = bytesToString(bytes.subarray(0, 40));
+  //   assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
+  //   return bytes;
+  // }
 
   /**
    * Capture a screenshot from the Playdate, and get the raw framebuffer
@@ -203,11 +209,13 @@ export class PlaydateDevice {
   async getScreen() {
     this.assertNotBusy();
     await this.serial.writeAscii('screen\n');
-    const bytes = await this.serial.read();
+    const bytes = await this.serial.readBytes(12011);
     assert(bytes.byteLength >= 12011, `Screen command response is too short, got ${ bytes.byteLength } bytes`);
-    const header = bytesToString(bytes.subarray(0, 11));
-    const frameBuffer = bytes.subarray(11, 12011);
-    assert(header.includes('~screen:'), 'Invalid screen command response');
+    const header = stringToBytes('~screen:\n');
+    let ptr = bytesPos(bytes, header);
+    assert(ptr !== -1, 'Invalid screen command response');
+    ptr += header.length;
+    const frameBuffer = bytes.subarray(ptr, ptr + 12000);
     return frameBuffer;
   }
 
@@ -244,8 +252,8 @@ export class PlaydateDevice {
     bytes.set(stringToBytes('bitmap\n'), 0);
     bytes.set(bitmap, 7);
     await this.serial.write(bytes);
-    const str = await this.serial.readAscii();
-    assert(str === '\r\n', `Invalid bitmap send response, got ${ str }`);
+    const [str] = await this.serial.readLinesUntilTimeout();
+    assert(str === '', `Invalid bitmap send response, got ${ str }`);
   }
 
   /**
@@ -278,39 +286,39 @@ export class PlaydateDevice {
    * While this is active, you won't be able to communicate with the device
    */
   async startPollingControls() {
-    this.assertNotBusy();
-    await this.serial.writeAscii('buttons\n');
-    this.emit('controls:start');
-    this.isPollingControls = true;
-    // isPollingControls will be set to false when stopPollingControls() is called
-    while (this.isPollingControls) {
-      try {
-        const str = await this.serial.readAscii();
-        const state = this.parseControlState(str);
-        if (state) {
-          this.lastControlState = state;
-          this.emit('controls:update', state);
-        }
-      }
-      catch(e) {
-        // if isPollingControls is false, that means stopPollingControls() was called, 
-        // and we can ignore this error because it cancels any ongoing transfers
-        // if it's still true, it means something actually went wrong
-        if (this.isPollingControls)
-          throw e;
-      }
-    }
-    // only reached when stopped
-    this.emit('controls:stop');
-    return true;
+  //   this.assertNotBusy();
+  //   await this.serial.writeAscii('buttons\n');
+  //   this.emit('controls:start');
+  //   this.isPollingControls = true;
+  //   // isPollingControls will be set to false when stopPollingControls() is called
+  //   while (this.isPollingControls) {
+  //     try {
+  //       const str = await this.serial.readAscii();
+  //       const state = this.parseControlState(str);
+  //       if (state) {
+  //         this.lastControlState = state;
+  //         this.emit('controls:update', state);
+  //       }
+  //     }
+  //     catch(e) {
+  //       // if isPollingControls is false, that means stopPollingControls() was called, 
+  //       // and we can ignore this error because it cancels any ongoing transfers
+  //       // if it's still true, it means something actually went wrong
+  //       if (this.isPollingControls)
+  //         throw e;
+  //     }
+  //   }
+  //   // only reached when stopped
+  //   this.emit('controls:stop');
+  //   return true;
   }
 
   /**
    * Get the current controls state, after startPollingControls() has been called
    */
   getControls() {
-    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
-    return this.lastControlState;
+  //   assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+  //   return this.lastControlState;
   }
 
   /**
@@ -318,34 +326,34 @@ export class PlaydateDevice {
    * After this has completed, you'll be able to communicate with the device again
    */
   async stopPollingControls() {
-    assert(this.isPollingControls, 'Controls are not currently being polled');
-    await this.serial.writeAscii('\n');
-    await this.serial.clear();
-    this.lastControlState = undefined;
-    this.isPollingControls = false;
+  //   assert(this.isPollingControls, 'Controls are not currently being polled');
+  //   await this.serial.writeAscii('\n');
+  //   await this.serial.clear();
+  //   this.lastControlState = undefined;
+  //   this.isPollingControls = false;
   }
 
   /**
    * Launch a .PDX rom at a given path, e.g. '/System/Crayons.pdx'
    */
-  async run(path: string) {
-    assert(path.startsWith('/'), 'Path must begin with a forward slash, e.g. "/System/Crayons.pdx"')
-    const str = await this.sendCommand(`run ${ path }`);
-    assert(str === '\r\n', `Invalid run response, got ${ str }`);
-  }
+  // async run(path: string) {
+  //   assert(path.startsWith('/'), 'Path must begin with a forward slash, e.g. "/System/Crayons.pdx"')
+  //   const str = await this.sendCommand(`run ${ path }`);
+  //   assert(str === '\r\n', `Invalid run response, got ${ str }`);
+  // }
 
   /**
    * Eval a pre-compiled lua function payload (has to be compiled with pdc) on the device
    */
-  async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
-    const cmd = `eval ${ payload.byteLength }\n`;
-    const data = new Uint8Array(cmd.length + payload.byteLength);
-    data.set(stringToBytes(cmd), 0);
-    data.set(new Uint8Array(payload), cmd.length);
-    await this.serial.write(data);
-    await sleep(waitTime);
-    return await this.serial.readAscii();
-  }
+  // async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
+  //   const cmd = `eval ${ payload.byteLength }\n`;
+  //   const data = new Uint8Array(cmd.length + payload.byteLength);
+  //   data.set(stringToBytes(cmd), 0);
+  //   data.set(new Uint8Array(payload), cmd.length);
+  //   await this.serial.write(data);
+  //   await sleep(waitTime);
+  //   return await this.serial.readAscii();
+  // }
 
   // not quite working yet
   // async startStreaming() {
@@ -379,37 +387,38 @@ export class PlaydateDevice {
    * Some commands are potentially dangerous and could harm your Playdate. *Please* don't execute any commands that you're unsure about!
    */
   async sendCommand(command: string) {
+    assert(this.isOpen);
     this.assertNotBusy();
     await this.serial.writeAscii(`${ command }\n`);
-    const str = await this.serial.readAscii();
+    const lines = await this.serial.readLinesUntilTimeout();
     if (this.logCommandResponse) {
-      const lines = splitLines(str);
       console.log(lines.join('\n'));
     }
-    return str;
+    return lines;
   }
 
   /**
    * This will clear out the input buffer if the device was still in button/streaming mode or wasn't properly closed
    */
-  async forceInputClear() {
-    while (true) {
-      await this.serial.writeAscii('\n'); // newline cancels button/streaming mode
-      const str = await this.serial.readAscii();
-      if (str.includes('Unknown command'))
-        break;
-    }
-  }
+  // async forceInputClear() {
+  //   while (true) {
+  //     await this.serial.writeAscii('\n'); // newline cancels button/streaming mode
+  //     const str = await this.serial.readAscii();
+  //     if (str.includes('Unknown command'))
+  //       break;
+  //   }
+  // }
 
   /**
    * Set the console echo state. By default, this is set to 'off' while opening the device
    */
   private async setEcho(echoState: 'on' | 'off') {
-    const str = await this.sendCommand(`echo ${ echoState }`);
+    const lines = await this.sendCommand(`echo ${ echoState }`);
+    const str = lines.pop();
     if (echoState === 'off') {
       // echo off should respond with nothing but a blank line
       // if echo was previously set to on, it will echo the given command one last time in response
-      assert(str.startsWith('\r\n') || str.includes('echo off'), `Invalid echo command response, got ${ str }`);
+      assert(str === '' || str.includes('echo off'), `Invalid echo command response, got ${ str }`);
     }
   }
 

@@ -1,180 +1,202 @@
-import { sleep, assert, assertExists, bytesToString, stringToBytes } from './utils';
+import { PDSerialMode, PDSerialTransformer } from './SerialTransformer';
+import { assert, stringToBytes, mergeByteChunks } from './utils';
+
+/**
+ * Event types for PlaydateDevice - register events with on()
+ */
+export type PDSerialEvent =
+ | 'open'
+ | 'close'
+ | 'disconnect'
+ | 'error'
+ | 'data'
+;
+
+/**
+ * Event callback function type
+ */
+export type PDSerialEventCallback<T extends any[] = any[]> = (...args: T) => void;
+
+export interface PDSerialOptions {
+  baudRate: number;
+  bufferSize: number;
+};
 
 /**
  * Handles USB connection and sending data to and fro
  */
-export class Serial {
+export class PDSerial {
 
-  device: USBDevice;
-  interface: USBInterface;
-  inpoint: USBEndpoint;
-  outpoint: USBEndpoint;
+  isOpen = false;
+  isReading = false;
 
-  constructor(device: USBDevice) {
-    this.device = device;
+  private port: SerialPort;
+  private options: PDSerialOptions;
+  private events: Partial<Record<PDSerialEvent, PDSerialEventCallback[]>> = {};
+  private readTransformer: PDSerialTransformer;
+  private reader: ReadableStreamDefaultReader<string | Uint8Array>;
+
+  constructor(port: SerialPort, options: PDSerialOptions) {
+    this.port = port;
+    this.options = options;
+    port.addEventListener('disconnect', this.handleDisconnect);
   }
 
   /**
-   * Indicates whether the serial is open or close to reading/writing
+   * Register an event callback
    */
-  get isOpen() {
-    return this.device.opened;
+  on(eventType: 'data', callback: PDSerialEventCallback<[Uint8Array]>): void;
+  on(eventType: PDSerialEvent, callback: PDSerialEventCallback): void;
+  on(eventType: PDSerialEvent, callback: PDSerialEventCallback): void {
+    (this.events[eventType] || (this.events[eventType] = [])).push(callback);
   }
 
   /**
-   * Open the device for communication
+   * Remove an event callback
+   */
+  off(eventType: PDSerialEvent, callback: PDSerialEventCallback) {
+    const callbackList = this.events[eventType];
+    if (callbackList)
+      callbackList.splice(callbackList.indexOf(callback), 1);
+  }
+
+  /**
+   * Emit an event
+   */
+  emit(eventType: PDSerialEvent, ...args: any[]) {
+    const callbackList = this.events[eventType] || [];
+    callbackList.forEach(fn => fn.apply(this, args));
+  }
+
+  /**
+   * Open the serial device to start communication
    */
   async open() {
-    await this.device.open();
-    this.interface = await this.getInterface();
-    this.inpoint = this.getEndpoint('in');
-    this.outpoint = this.getEndpoint('out');
+    await this.port.open({ ...this.options });
+    this.readTransformer = new PDSerialTransformer();
+    const readable = this.port.readable;
+    const stream = readable.pipeThrough(new TransformStream(this.readTransformer));
+    this.reader = stream.getReader();
+    this.isOpen = true;
+    this.emit('open');
   }
 
   /**
-   * Send a Uint8Array to the USB device
+   * Closes the serial device, stopping communication
+   */
+  async close() {
+    await this.port.close();
+    this.isOpen = false;
+    // this.stopReadingLoop();
+    this.emit('close');
+  }
+
+  /**
+   * Send a Uint8Array to the serial device
    */
   async write(bytes: Uint8Array) {
     assert(this.isOpen, 'Serial is not open, please call open() before beginning to write data');
-    const outpoint = this.outpoint;
-    const packetSize = outpoint.packetSize;
-
-    let ptr = 0;
-    let bytesLeft = bytes.byteLength
-    while (bytesLeft > 0) {
-      const size = Math.min(packetSize, bytesLeft);
-      const packetData = bytes.subarray(ptr, ptr + size);
-      const reply = await this.device.transferOut(outpoint.endpointNumber, packetData);
-      const bytesWritten = reply.bytesWritten;
-      if (reply.status !== 'ok')
-        throw `Write error: got status ${ reply.status }`;
-      if (bytesWritten === 0)
-        throw `Write error: no bytes could be written`;
-      bytesLeft -= bytesWritten;
-      ptr += bytesWritten;
-    }
+    const writer = this.port.writable.getWriter();
+    await writer.write(bytes);
+    writer.releaseLock();
   }
 
   /**
-   * Send a string of ascii characters to the USB device
+   * Send an ascii string to the serial device
    */
   async writeAscii(str: string) {
     const bytes = stringToBytes(str);
     return await this.write(bytes);
   }
 
-  /**
-   * Read data from the USB device as a Uint8Array of bytes
-   * Will keep reading until the device has no more data to give
-   */
-  async read() {
-    assert(this.isOpen, 'Serial is not open, please call open() before beginning to read data');
-    const inpoint = this.inpoint;
+  async readBytes(num = 0) {
+    try {
+      this.readTransformer.setMode(PDSerialMode.Bytes);
+      this.readTransformer.bytesTarget = num;
+      const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<Uint8Array>;
+      this.readTransformer.bytesTarget = 0;
+      return value;
+    }
+    catch (error) {
+      this.emit('error', error);
+    }
+  }
 
-    const packets: DataView[] = [];
-    let hasStartedToReceiveData = false;
-    let responseSize = 0;
+  async readLine() {
+    try {
+      this.readTransformer.setMode(PDSerialMode.Lines);
+      const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<string>;
+      return value;
+    }
+    catch (error) {
+      this.emit('error', error);
+    }
+  }
 
-    // packet transfer loop
-    while (true) {
-      const packet = await this.device.transferIn(inpoint.endpointNumber, inpoint.packetSize);
-      const dataSize = packet.data.byteLength;
-      if (packet.status === 'ok') {
-        // zero-byte packet signals the end of data
-        if (hasStartedToReceiveData && dataSize === 0)
-          break;
-        // not sure if this is correct, but seems as though if the data starts with zero-byte packet, we need to wait for some to come
-        else if (!hasStartedToReceiveData && dataSize === 0) {
-          await sleep(100);
-          continue;
-        }
-        // add packet to buffer
-        else {
-          hasStartedToReceiveData = true;
-          responseSize += dataSize;
-          packets.push(packet.data);
-        }
+  async doReadWithTimeout<T = Uint8Array | string>(
+    timeoutMs: number,
+    readFn: (...args: any[]) => Promise<T>,
+    ...readFnArgs: any[]
+  ) {
+    return new Promise<{ value: T, done: boolean }>((resolve, reject) => {
+      
+      const timer = setTimeout(() => {
+        resolve({ value: null, done: true });
+        // this is SUPER IMPORTANT, the readFn that has timed out still needs to complete somehow,
+        // otherwise it will just block further reads
+        // I imagine there's a nicer way to handle this, but I can't find any good information out there...
+        this.readTransformer.clearOut();
+      }, timeoutMs);
+
+      try {
+        readFn.bind(this)(...readFnArgs).then((result: any) => {
+          clearTimeout(timer);
+          resolve({ value: result, done: false });
+        });
       }
-      else if (packet.status === 'babble') {
-        // TODO: what to do here?
-        throw new Error(`Device responded with too much data for packet`);
+      catch(error) {
+        clearTimeout(timer);
+        reject(error);
       }
-      else if (packet.status === 'stall') {
-        // TODO: what to do here?
-        console.warn(`USB stalled during read`);
-        //  apparently this helps recover from a stall
-        await this.device.clearHalt('in', inpoint.endpointNumber);
-        break;
+    });
+  }
+
+  async readLinesUntilTimeout(ms = 50) {
+    let lines:string[] = [];
+    while (this.isOpen && this.port.readable) {
+      try {
+        const { value, done } = await this.doReadWithTimeout(ms, this.readLine);
+        if (value !== null)
+          lines.push(value);
+        if (done)
+          return lines;
+      } 
+      catch (error) {
+        this.emit('error', error);
       }
     }
+  }
 
-    // merge packets into byte array
-    let ptr = 0;
-    const bytes = new Uint8Array(responseSize);
-    for (let i = 0; i < packets.length; i++) {
-      const packet = packets[i];
-      const packetBytes = new Uint8Array(packet.buffer);
-      bytes.set(packetBytes, ptr);
-      ptr += packetBytes.byteLength;
+  async readBytesUntilTimeout(ms = 50) {
+    let chunks: Uint8Array[] = [];
+    while (this.isOpen && this.port.readable) {
+      try {
+        const { value, done } = await this.doReadWithTimeout(ms, this.readBytes);
+        if (value !== null)
+          chunks.push(value);
+        if (done)
+          return mergeByteChunks(chunks);
+      } 
+      catch (error) {
+        this.emit('error', error);
+      }
     }
-
-    return bytes;
   }
 
-  /**
-   * Read data from the USB device as a string of ascii characters
-   * Will keep reading until the device has no more data to give
-   */
-  async readAscii() {
-    const bytes = await this.read();
-    return bytesToString(bytes);
-  }
-
-  /**
-   * Clear in and out endpoints
-   */
-  async clear() {
-    const inpoint = this.inpoint;
-    const outpoint = this.outpoint;
-    this.device.clearHalt('in', inpoint.endpointNumber);
-    this.device.clearHalt('out', outpoint.endpointNumber);
-  }
-
-  /**
-   * Close the USB device for communication
-   */
-  async close() {
-    await this.device.releaseInterface(this.interface.interfaceNumber);
-    this.interface = null;
-    await this.device.close();
-  }
-
-  private async getInterface(): Promise<USBInterface> {
-    assert(this.isOpen, 'Serial is not open');
-    // set the config to use for the device
-    // TODO: check if always selecting config 1 is valid? 
-    await this.device.selectConfiguration(1);
-    const config = this.device.configuration;
-    // run through all the device interfaces and attempt to claim one
-    const interfaces = await Promise.allSettled(config.interfaces.map(async (intf) => {
-      await this.device.claimInterface(intf.interfaceNumber);
-      return intf;
-    }));
-    // find the first interface that was claimable
-    const result = interfaces.find(claimResult => claimResult.status === 'fulfilled');
-    if (result)
-      return (result as PromiseFulfilledResult<USBInterface>).value;
-    throw new Error(`Unable to establish a USB interface, disconnect the Playdate and try again`);
-  }
-
-  private getEndpoint(direction: USBDirection) {
-    assert(this.isOpen, 'Serial is not open');
-    assertExists(this.interface, 'interface');
-    assert(this.interface.claimed);
-    // run through interfaces and attempt to find an endpoint matching the requested direction
-    const endpoint = this.interface.alternate.endpoints.find(ep => ep.direction == direction);
-    if (endpoint)
-      return endpoint;
-    throw new Error(`${ direction }ward endpoint not found on device USB interface.`);
+  private handleDisconnect = () => {
+    this.isOpen = false;
+    this.isReading = false;
+    this.emit('disconnect');
+    console.log('disconnected', this);
   }
 }
