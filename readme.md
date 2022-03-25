@@ -1,6 +1,8 @@
-# playdate-usb
+# pd-usb
 
 JavaScript library for interacting with a [Panic Playdate](http://play.date/) console over USB, wherever [WebUSB](https://web.dev/usb/) is supported.
+
+> ⚠️ This library is unofficial and is not affiliated with Panic. Details on the USB protocol were gleaned from reverse-engineering and packet sniffing. Things may be incorrect.
 
 ## Features
 
@@ -18,18 +20,16 @@ JavaScript library for interacting with a [Panic Playdate](http://play.date/) co
 
 ## Installation
 
-> ⚠️ TODO: this project isn't actually on NPM or Unpkg yet, that will happen on release!
-
 ### With NPM
 
 ```shell
-npm install playdate-usb --save
+npm install pd-usb --save
 ```
 
 Then assuming you're using a module-compatible system (like Webpack, Rollup, etc):
 
 ```js
-import { requestConnectPlaydate } from 'playdate-usb';
+import { requestConnectPlaydate } from 'pd-usb';
 
 async function connectToPlaydate() {
   const playdate = await requestConnectPlaydate();
@@ -42,7 +42,7 @@ Using the module directly via Unpkg:
 
 ```html
 <script type="module">
-  import { requestConnectPlaydate } from 'https://unpkg.com/playdate-usb?module';
+  import { requestConnectPlaydate } from 'https://unpkg.com/pd-usb?module';
 
   async function connectToPlaydate() {
     const playdate = await requestConnectPlaydate();
@@ -53,7 +53,7 @@ Using the module directly via Unpkg:
 Using an external script reference
 
 ```html
-<script src="https://unpkg.com/playdate-usb/dist/playdate-usb.min.js"></script>
+<script src="https://unpkg.com/pd-usb/dist/pd-usb.min.js"></script>
 <script>
   async function connectToPlaydate() {
     const playdate = await playdateUsb.requestConnectPlaydate();
@@ -76,7 +76,7 @@ WebUSB is also only supported in [Secure Contexts](https://developer.mozilla.org
 You can use the `isUsbSupported()` method to check if the current environment supports WebUSB:
 
 ```js
-import { isUsbSupported } from 'playdate-usb';
+import { isUsbSupported } from 'pd-usb';
 
 if (!isUsbSupported) {
   alert('Sorry, your browser does not support USB, and cannot connect to a Playdate :(')
@@ -96,7 +96,7 @@ For security reasons, `requestConnectPlaydate()` can only be called with a user 
 Then call `requestConnectPlaydate()` in the button's `click` event callback function:
 
 ```js
-import { requestConnectPlaydate } from 'playdate-usb';
+import { requestConnectPlaydate } from 'pd-usb';
 
 const button = document.getElementById('connectButton');
 
@@ -201,7 +201,7 @@ Capture a screenshot from the Playdate, and get the unpacked framebuffer. This w
 const screenPixels = await device.getScreenIndexed();
 ```
 
-If you want to draw the screen to a HTML5 canvas, check out the [screen example](https://github.com/jaames/playdate-usb/blob/main/examples/example-screen.html).
+If you want to draw the screen to a HTML5 canvas, check out the [screen example](https://github.com/jaames/pd-usb/blob/main/examples/example-screen.html).
 
 #### `sendBitmap`
 
@@ -227,7 +227,7 @@ const pixels = new Uint8Array(400 * 240);
 await device.sendBitmapIndexed(pixels);
 ```
 
-If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap example](https://github.com/jaames/playdate-usb/blob/main/examples/example-bitmap.html).
+If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap example](https://github.com/jaames/pd-usb/blob/main/examples/example-bitmap.html).
 
 #### `run`
 
