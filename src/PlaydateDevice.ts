@@ -10,6 +10,7 @@ import {
 
 import {
   assert,
+  sleep,
   parseKeyVal,
   bytesToString,
   stringToBytes,
@@ -191,17 +192,6 @@ export class PlaydateDevice {
   }
 
   /**
-   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as an Uint8Array of bytes
-   */
-  // async getRawConsoleOutput() {
-  //   await this.serial.writeAscii('eval\n');
-  //   const bytes = await this.serial.read();
-  //   const str = bytesToString(bytes.subarray(0, 40));
-  //   assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
-  //   return bytes;
-  // }
-
-  /**
    * Capture a screenshot from the Playdate, and get the raw framebuffer
    * This will return the 1-bit framebuffer data as an Uint8Array of bytes, where each bit in the byte will represent 1 pixel; `0` for black, `1` for white
    * The framebuffer is 400 x 240 pixels
@@ -286,39 +276,42 @@ export class PlaydateDevice {
    * While this is active, you won't be able to communicate with the device
    */
   async startPollingControls() {
-  //   this.assertNotBusy();
-  //   await this.serial.writeAscii('buttons\n');
-  //   this.emit('controls:start');
-  //   this.isPollingControls = true;
-  //   // isPollingControls will be set to false when stopPollingControls() is called
-  //   while (this.isPollingControls) {
-  //     try {
-  //       const str = await this.serial.readAscii();
-  //       const state = this.parseControlState(str);
-  //       if (state) {
-  //         this.lastControlState = state;
-  //         this.emit('controls:update', state);
-  //       }
-  //     }
-  //     catch(e) {
-  //       // if isPollingControls is false, that means stopPollingControls() was called, 
-  //       // and we can ignore this error because it cancels any ongoing transfers
-  //       // if it's still true, it means something actually went wrong
-  //       if (this.isPollingControls)
-  //         throw e;
-  //     }
-  //   }
-  //   // only reached when stopped
-  //   this.emit('controls:stop');
-  //   return true;
+    this.assertNotBusy();
+    await this.serial.writeAscii('buttons\n');
+    this.emit('controls:start');
+    // isPollingControls will be set to false when stopPollingControls() is called
+    this.isPollingControls = true;
+    this.pollControlsLoop();
+  }
+
+  async pollControlsLoop() {
+    while (this.isPollingControls && this.port.readable) {
+      try {
+        const line = await this.serial.readLine();
+        const state = this.parseControlState(line);
+        if (state) {
+          this.lastControlState = state;
+          this.emit('controls:update', state);
+        }
+      }
+      catch(e) {
+        // if isPollingControls is false, that means stopPollingControls() was called, 
+        // and we can ignore this error because it cancels any ongoing transfers
+        // if it's still true, it means something actually went wrong
+        if (this.isPollingControls)
+          throw e;
+      }
+    }
+    // only reached when stopped
+    this.emit('controls:stop');
   }
 
   /**
    * Get the current controls state, after startPollingControls() has been called
    */
   getControls() {
-  //   assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
-  //   return this.lastControlState;
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    return this.lastControlState;
   }
 
   /**
@@ -326,34 +319,33 @@ export class PlaydateDevice {
    * After this has completed, you'll be able to communicate with the device again
    */
   async stopPollingControls() {
-  //   assert(this.isPollingControls, 'Controls are not currently being polled');
-  //   await this.serial.writeAscii('\n');
-  //   await this.serial.clear();
-  //   this.lastControlState = undefined;
-  //   this.isPollingControls = false;
+    assert(this.isPollingControls, 'Controls are not currently being polled');
+    await this.serial.writeAscii('\n');
+    this.lastControlState = undefined;
+    this.isPollingControls = false;
   }
 
   /**
    * Launch a .PDX rom at a given path, e.g. '/System/Crayons.pdx'
    */
-  // async run(path: string) {
-  //   assert(path.startsWith('/'), 'Path must begin with a forward slash, e.g. "/System/Crayons.pdx"')
-  //   const str = await this.sendCommand(`run ${ path }`);
-  //   assert(str === '\r\n', `Invalid run response, got ${ str }`);
-  // }
+  async run(path: string) {
+    assert(path.startsWith('/'), 'Path must begin with a forward slash, e.g. "/System/Crayons.pdx"')
+    const [str] = await this.sendCommand(`run ${ path }`);
+    assert(str === '', `Invalid run response, got ${ str }`);
+  }
 
   /**
    * Eval a pre-compiled lua function payload (has to be compiled with pdc) on the device
    */
-  // async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
-  //   const cmd = `eval ${ payload.byteLength }\n`;
-  //   const data = new Uint8Array(cmd.length + payload.byteLength);
-  //   data.set(stringToBytes(cmd), 0);
-  //   data.set(new Uint8Array(payload), cmd.length);
-  //   await this.serial.write(data);
-  //   await sleep(waitTime);
-  //   return await this.serial.readAscii();
-  // }
+  async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
+    const cmd = `eval ${ payload.byteLength }\n`;
+    const data = new Uint8Array(cmd.length + payload.byteLength);
+    data.set(stringToBytes(cmd), 0);
+    data.set(new Uint8Array(payload), cmd.length);
+    await this.serial.write(data);
+    await sleep(waitTime);
+    return await this.serial.readLinesUntilTimeout();
+  }
 
   // not quite working yet
   // async startStreaming() {
@@ -458,23 +450,4 @@ export class PlaydateDevice {
       [PlaydateButton.kButtonLock]:  (flags & masks[PlaydateButton.kButtonLock])  !== 0,
     }
   }
-
-  /**
-   * Send an ESP-AT command to the ESP-32 firmware
-   * https://docs.espressif.com/projects/esp-at/en/latest/Get_Started/What_is_ESP-AT.html
-   * NOTE: these could potentially be very dangerous, use this function at your own peril!
-   */
-  // async sendEspCommand(command: string) {
-  //   this.assertNotBusy();
-  //   await this.serial.writeAscii(`esp ${ command }\n`);
-  //   let i = 0;
-  //   while (i < 10) {
-  //     const str = await this.serial.readAscii();
-  //     console.log(str);
-  //     if (str.includes('OK') || str.includes('ERROR'))
-  //       break;
-  //     await sleep(100);
-  //     i++;
-  //   }
-  // }
 }
