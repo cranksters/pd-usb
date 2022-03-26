@@ -1,8 +1,8 @@
 # pd-usb
 
-JavaScript library for interacting with a [Panic Playdate](http://play.date/) console over USB, wherever [WebUSB](https://web.dev/usb/) is supported.
+JavaScript library for interacting with a [Panic Playdate](http://play.date/) console over USB, wherever [WebSerial](https://web.dev/serial/) is supported.
 
-> ⚠️ This library is unofficial and is not affiliated with Panic. Details on the USB protocol were gleaned from reverse-engineering and packet sniffing. Things may be incorrect.
+> ⚠️ This library is unofficial and is not affiliated with Panic. Details on the USB protocol were gleaned from reverse-engineering and packet sniffing. Things may be incorrect!
 
 ## Features
 
@@ -67,13 +67,13 @@ When using the library this way, a global called `playdateUsb` will be created c
 
 ### Preamble
 
-WebUSB is asynchronous by nature, so this library uses [`async/await`](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Asynchronous/Async_await) a lot. If you're not already familiar with that, now would be a good time to catch up!
+WebSerial is asynchronous by nature, so this library uses [`async/await`](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Asynchronous/Async_await) a lot. If you're not already familiar with that, now would be a good time to catch up!
 
-### Detecting WebUSB support
+### Detecting WebSerial support
 
-WebUSB is also only supported in [Secure Contexts](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts), and only in [certain browsers](https://developer.mozilla.org/en-US/docs/Web/API/USB#browser_compatibility) (currently Google Chrome, Microsoft Edge, and Opera). 
+WebSerial is also only supported in [Secure Contexts](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts), and only in [certain browsers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API#browser_compatibility) (currently Google Chrome, Microsoft Edge, and Opera). 
 
-You can use the `isUsbSupported()` method to check if the current environment supports WebUSB:
+You can use the `isUsbSupported()` method to check if the current environment supports WebSerial:
 
 ```js
 import { isUsbSupported } from 'pd-usb';
@@ -152,7 +152,7 @@ The following events are available:
 | `close` | The device has been closed |
 | `disconnect` | The device has been physically disconnected |
 | `controls:start` | Control-polling mode has been started |
-| `controls:update` | A new control state has been received while control-polling mode |
+| `controls:update` | A new control state has been received while control-polling mode is active |
 | `controls:stop` | Control-polling mode has been stopped |
 
 ### PlaydateDevice API
@@ -174,16 +174,6 @@ Returns the Playdate's serial number as a string, useful for if you need the use
 ```js
 const serial = await device.getSerial();
 ```
-
-#### `getConsoleOutput`
-
-Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string.
-
-```js
-const consoleOutput = await device.getConsoleOutput();
-```
-
-Alternatively, you can use` getRawConsoleOutput()` to get the console output as an Uint8Array of bytes, if for example you have printed binary data to the console.
 
 #### `getScreen`
 
@@ -289,7 +279,7 @@ Sends a plaintext command directly to the Playdate, and returns the response as 
 
 #### `evalLuaPayload`
 
-Sends a compiled Lua function to the device to be evaluated. The payload must be a Playdate-compatible Lua function compiled with [`luaU_dump()`](https://github.com/lua/lua/blob/v5.4-alpha/ldump.c#L215) from luac. It will return anything printed to the device's console.
+Sends a compiled Lua function to the device to be evaluated. The payload must be a Playdate-compatible Lua function compiled with `pdc` from the Playdate SDK. It will return anything printed to the device's console.
 
 > ⚠️ This is pretty hardcore, you're probably not going to find this useable unless you really know what you're doing. 
 
@@ -303,9 +293,8 @@ await device.evalLuaPayload(payloadData);
 Contributions and ports to other languages are welcome! Here's a list of things I'd like to do, but haven't found the time yet:
 
 - Node support
-- Playdate streaming support
+- Figure out how Playdate streaming works
 - Stack traces, memory stats, CPU stats, etc
-- The `eval` command seems really interesting, and it could be neat to look into dynamically building a compiled lua function that can send/receive data with the currently running game.
 - Port to another language to build a general Playdate USB CLI tool?
 
 ### USB Docs
@@ -318,7 +307,7 @@ To build the project, you'll need to have Node and NPM installed. Clone the repo
 
 ## Special Thanks
 
- - [Matt Sephton](https://github.com/gingerbeardman) for helping me get access to the Playdate Developer Preview
+ - [Matt](https://github.com/gingerbeardman) for helping me get into the Playdate Developer Preview
  - This [blogpost from Secure Systems Lab](https://ssl.engineering.nyu.edu/blog/2018-01-08-WebUSB) on reverse-engineering USB with WireShark and translating from captured packets to WebUSB calls
  - Suz Hinton's fun [talk about WebUSB at JSConf 2018](https://www.youtube.com/watch?v=IpfZ8Nj3uiE)
  - The folks at [Panic](https://panic.com/) for making such a wonderful and fascinating handheld
