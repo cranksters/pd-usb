@@ -1,13 +1,16 @@
 import { stringToBytes, bytesToString, mergeByteChunks } from './utils';
 
+type PDStreamController<T = Uint8Array | string> = TransformStreamDefaultController<T>;
+
 export const enum PDSerialMode {
   Bytes,
   Lines
 };
 
 export class PDSerialTransformer {
+
   mode = PDSerialMode.Lines;
-  controller: TransformStreamDefaultController<Uint8Array | string>;
+  controller: PDStreamController;
 
   lineBuffer = '';
   asciiDecoder = new TextDecoder('ascii');
@@ -16,6 +19,12 @@ export class PDSerialTransformer {
   bytesReceived = 0;
   // if not 0, transformer will collect byte input until this many bytes have been read
   bytesTarget = 0;
+
+  private dataReceivedCallback = (data: Uint8Array) => {};
+
+  onData(callbackFn: (data: Uint8Array) => void) {
+    this.dataReceivedCallback = callbackFn;
+  }
 
   setMode(mode: PDSerialMode) {
     if (this.mode !== mode) {
@@ -32,23 +41,30 @@ export class PDSerialTransformer {
       this.mode = mode;
     }
   }
+  
+  clearOut() {
+    if (this.mode === PDSerialMode.Lines)
+      this.controller.enqueue('');
 
-  transform(chunk: Uint8Array, controller: TransformStreamDefaultController<Uint8Array | string>) {
+    else if (this.mode === PDSerialMode.Bytes)
+      this.controller.enqueue(new Uint8Array(0));
+  }
+
+  start(controller: PDStreamController) {
     this.controller = controller;
+  }
 
+  transform(chunk: Uint8Array, controller: PDStreamController) {
     if (this.mode === PDSerialMode.Lines)
       this.transformLines(chunk, controller);
 
     else if (this.mode === PDSerialMode.Bytes)
       this.transformBytes(chunk, controller);
+
+    this.dataReceivedCallback(chunk);
   }
 
-  clearOut() {
-    if (this.controller)
-      this.controller.enqueue('');
-  }
-
-  flush(controller: TransformStreamDefaultController<Uint8Array | string>) {
+  flush(controller: PDStreamController) {
     if (this.mode === PDSerialMode.Lines)
       this.flushLines(controller);
 
@@ -56,18 +72,17 @@ export class PDSerialTransformer {
       this.flushBytes(controller);
   }
 
-  transformLines(chunk: Uint8Array, controller: TransformStreamDefaultController<string>) {
+  transformLines(chunk: Uint8Array, controller: PDStreamController<string>) {
     this.lineBuffer += this.asciiDecoder.decode(chunk);
     const lines = this.lineBuffer.split(/\r?\n/);
     this.lineBuffer = lines.pop();
     lines.forEach(line => controller.enqueue(line));
   }
 
-  transformBytes(chunk: Uint8Array, controller: TransformStreamDefaultController<Uint8Array>) {
+  transformBytes(chunk: Uint8Array, controller: PDStreamController<Uint8Array>) {
     if (this.bytesTarget > 0) {
       this.bytePackets.push(chunk);
       this.bytesReceived += chunk.byteLength;
-
       if (this.bytesReceived >= this.bytesTarget) {
         controller.enqueue(mergeByteChunks(this.bytePackets));
         this.bytePackets = [];
@@ -79,10 +94,10 @@ export class PDSerialTransformer {
     }
   }
 
-  flushLines(controller: TransformStreamDefaultController<string>) {
+  flushLines(controller: PDStreamController<string>) {
     controller.enqueue(this.lineBuffer);
     this.lineBuffer = '';
   }
 
-  flushBytes(controller: TransformStreamDefaultController<Uint8Array>) {}
+  flushBytes(controller: PDStreamController<Uint8Array>) {}
 }

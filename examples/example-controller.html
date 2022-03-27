@@ -4,25 +4,25 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playdate USB demo - reading controls</title>
+  <title>PD-USB Demo - Input State Capture</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <script src="./pd-usb.js"></script>
 </head>
 <body>
   <div class="wrapper">
     <header>
-      <h1>Playdate USB demo - reading controls</h1>
+      <h1>PD-USB Demo - Input State Capture</h1>
     </header>
     <main>
       <div class="panel">
         <div class="row">
           <div class="pull-left">
-            <button onclick="connect()" id="connectButton"> connect to playdate </button>
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
             <span id="serial"></span>
           </div>
           <div class="pull-right">
-            <button onclick="start()" id="startButton" disabled> begin polling controls </button>
-            <button onclick="stop()" id="stopButton" disabled> stop polling controls </button>
+            <button onclick="start()" id="startButton" disabled> Begin </button>
+            <button onclick="stop()" id="stopButton" disabled> Stop </button>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@
         <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-controller.html">page source</a>
       </div>
       <div class="pull-right">
-        built by <a href="//github.com/jaames">james daniel</a>
+        built by <a href="//github.com/jaames">jaames</a>
       </div>
     </footer>
   </div>
@@ -71,9 +71,9 @@
     const inputCrank = document.getElementById('inputCrank');
     const inputDocked = document.getElementById('inputDocked');
 
-    // Check WebUSB support, display error if not supported
+    // Check WebSerial support, display error if not supported
     try {
-      playdateUsb.assertUsbSupported();
+      pdusb.assertUsbSupported();
     }
     catch (e) {
       document.getElementById('serial').innerHTML = e.message;
@@ -82,7 +82,7 @@
 
     async function connect() {
       try {
-        device = await playdateUsb.requestConnectPlaydate();
+        device = await pdusb.requestConnectPlaydate();
         
         await device.open();
 
@@ -98,7 +98,8 @@
           document.getElementById('stopButton').disabled = true;
         });
       }
-      catch {
+      catch(e) {
+        console.warn(e);
         document.getElementById('serial').innerHTML = 'Error connecting to Playdate, try again'
       }
     }
@@ -119,14 +120,14 @@
       inputCrank.innerHTML = state.crank;
       inputDocked.innerHTML = state.crankDocked;
 
-      inputA.innerHTML = state.button.a ? 'pressed' : '';
-      inputB.innerHTML = state.button.b ? 'pressed' : '';
-      inputMenu.innerHTML = state.button.menu ? 'pressed' : '';
-      inputLock.innerHTML = state.button.lock ? 'pressed' : '';
-      inputUp.innerHTML = state.button.up ? 'pressed' : '';
-      inputDown.innerHTML = state.button.down ? 'pressed' : '';
-      inputLeft.innerHTML = state.button.left ? 'pressed' : '';
-      inputRight.innerHTML = state.button.right ? 'pressed' : '';
+      inputA.innerHTML = state.button.a ? '✅' : '❌';
+      inputB.innerHTML = state.button.b ? '✅' : '❌';
+      inputMenu.innerHTML = state.button.menu ? '✅' : '❌';
+      inputLock.innerHTML = state.button.lock ? '✅' : '❌';
+      inputUp.innerHTML = state.button.up ? '✅' : '❌';
+      inputDown.innerHTML = state.button.down ? '✅' : '❌';
+      inputLeft.innerHTML = state.button.left ? '✅' : '❌';
+      inputRight.innerHTML = state.button.right ? '✅' : '❌';
     }
   </script>
 </body>

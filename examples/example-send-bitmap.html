@@ -4,38 +4,38 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playdate USB demo - send bitmap</title>
+  <title>PD-USB Demo - Send Bitmap</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <script src="./pd-usb.js"></script>
 </head>
 <body>
   <div class="wrapper">
     <header>
-      <h1>Playdate USB demo - send bitmap</h1>
+      <h1>PD-USB Demo - Send Bitmap</h1>
     </header>
     <main>
       <div class="panel">
         <div class="row">
           <div class="pull-left">
-            <button onclick="connect()" id="connectButton"> connect to playdate </button>
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
             <span id="serial"></span>
           </div>
           <div class="pull-right">
-            <button onclick="sendBitmap()" id="sendButton" disabled> send bitmap </button>
+            <button onclick="sendBitmap()" id="sendButton" disabled> Send bitmap </button>
           </div>
         </div>
       </div>
       <div class="panel" id="data">
-        <p>draw something here, then click 'send bitmap'</p>
+        <p>Draw something here, then click 'Send bitmap'</p>
         <canvas id="canvas"></canvas>
         <p>
-          <b>color:</b> <a onclick="setColor(0)">black</a> | <a onclick="setColor(1)">white</a>
+          <b>pen color:</b> <a onclick="setColor(0)">black</a> | <a onclick="setColor(1)">white</a>
         </p>
         <p>
-          <b>size:</b> <a onclick="setSize(1)">1</a> | <a onclick="setSize(2)">2</a> | <a onclick="setSize(3)">3</a> | <a onclick="setSize(5)">5</a> | <a onclick="setSize(10)">10</a> | <a onclick="setSize(20)">20</a> | <a onclick="setSize(30)">30</a>
+          <b>pen size:</b> <a onclick="setSize(1)">1</a> | <a onclick="setSize(2)">2</a> | <a onclick="setSize(3)">3</a> | <a onclick="setSize(5)">5</a> | <a onclick="setSize(10)">10</a> | <a onclick="setSize(20)">20</a> | <a onclick="setSize(30)">30</a>
         </p>
         <p>
-          <b>canvas:</b> <a onclick="wipeCanvas()">clear</a>
+          <a onclick="wipeCanvas()">clear canvas</a>
         </p>
       </div>
     </main>
@@ -44,7 +44,7 @@
         <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-send-bitmap.html">page source</a>
       </div>
       <div class="pull-right">
-        built by <a href="//github.com/jaames">james daniel</a>
+        built by <a href="//github.com/jaames">jaames</a>
       </div>
     </footer>
   </div>
@@ -52,9 +52,9 @@
   <script>
     var device;
     
-    // Check WebUSB support, display error if not supported
+    // Check WebSerial support, display error if not supported
     try {
-      playdateUsb.assertUsbSupported();
+      pdusb.assertUsbSupported();
     }
     catch (e) {
       document.getElementById('serial').innerHTML = e.message;
@@ -63,7 +63,7 @@
 
     async function connect() {
       try {
-        device = await playdateUsb.requestConnectPlaydate();
+        device = await pdusb.requestConnectPlaydate();
         
         if (device == null)
           throw new Error('Could not find playdate')
@@ -89,8 +89,8 @@
       await device.sendBitmapIndexed(bitmap);
     }
 
-    const w = playdateUsb.PLAYDATE_WIDTH;
-    const h = playdateUsb.PLAYDATE_HEIGHT;
+    const w = pdusb.PLAYDATE_WIDTH;
+    const h = pdusb.PLAYDATE_HEIGHT;
     const bitmap = new Uint8Array(w * h).fill(1);
 
     const canvas = document.getElementById('canvas');

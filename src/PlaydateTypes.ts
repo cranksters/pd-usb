@@ -1,7 +1,7 @@
 /**
  * Playdate version information, retrieved by getVersion()
  */
-export interface PlaydateVersion {
+export interface PDVersion {
   sdk: string;
   build: string;
   bootBuild: string;
@@ -12,54 +12,64 @@ export interface PlaydateVersion {
 };
 
 /**
- * Playdate hardware buttons
+ * Playdate hardware button masks
  */
-export enum PlaydateButton {
-  kButtonA = 'a',
-  kButtonB = 'b',
-  kButtonUp = 'up',
-  kButtonDown = 'down',
-  kButtonLeft = 'left',
-  kButtonRight = 'right',
-  kButtonMenu = 'menu',
-  kButtonLock = 'lock',
+export const enum PDButton {
+  kButtonLeft =  1,
+  kButtonRight = 1 << 1,
+  kButtonUp =    1 << 2,
+  kButtonDown =  1 << 3,
+  kButtonB =     1 << 4,
+  kButtonA =     1 << 5,
+  kButtonMenu =  1 << 6,
+  kButtonLock =  1 << 7,
 };
 
 /**
- * Bitmasks for each button, used for parsing "button" command values
+ * Type for button name strings
  */
-export const PlaydateButtonBitmask: Record<PlaydateButton, number> = {
-  [PlaydateButton.kButtonLeft]:  1,
-  [PlaydateButton.kButtonRight]: 1 << 1,
-  [PlaydateButton.kButtonUp]:    1 << 2,
-  [PlaydateButton.kButtonDown]:  1 << 3,
-  [PlaydateButton.kButtonB]:     1 << 4,
-  [PlaydateButton.kButtonA]:     1 << 5,
-  [PlaydateButton.kButtonMenu]:  1 << 6,
-  [PlaydateButton.kButtonLock]:  1 << 7,
+ export type PDButtonName = 'left' | 'right' | 'up' | 'down' | 'a' | 'b' | 'menu' | 'lock';
+
+/**
+ * Names for each button bitmask
+ */
+export const PDButtonNameMap: Record<PDButton, PDButtonName> = {
+  [PDButton.kButtonLeft]:  'left',
+  [PDButton.kButtonRight]: 'right',
+  [PDButton.kButtonUp]:    'up',
+  [PDButton.kButtonDown]:  'down',
+  [PDButton.kButtonB]:     'a',
+  [PDButton.kButtonA]:     'b',
+  [PDButton.kButtonMenu]:  'menu',
+  [PDButton.kButtonLock]:  'lock',
+};
+
+/**
+ * Maps button name strings back to the button bitmask
+ */
+export const PDButtonBitmaskMap: Record<PDButtonName, PDButton> = {
+  'left':  PDButton.kButtonLeft,
+  'right': PDButton.kButtonRight,
+  'up':    PDButton.kButtonUp,
+  'down':  PDButton.kButtonDown,
+  'a':     PDButton.kButtonB,
+  'b':     PDButton.kButtonA,
+  'menu':  PDButton.kButtonMenu,
+  'lock':  PDButton.kButtonLock,
 };
 
 /**
  * Represents parsed button bitflags as a series of bools for each button
  */
-export interface PlaydateButtonState {
-  [PlaydateButton.kButtonLeft]:  boolean,
-  [PlaydateButton.kButtonRight]: boolean,
-  [PlaydateButton.kButtonUp]:    boolean,
-  [PlaydateButton.kButtonDown]:  boolean,
-  [PlaydateButton.kButtonB]:     boolean,
-  [PlaydateButton.kButtonA]:     boolean,
-  [PlaydateButton.kButtonMenu]:  boolean,
-  [PlaydateButton.kButtonLock]:  boolean,
-};
+export type PDButtonState = Record<PDButtonName, boolean>;
 
 /**
  * Represents parse control state
  */
-export interface PlaydateControlState {
+export interface PDControlState {
   crank: number;
   crankDocked: boolean;
-  button: PlaydateButtonState;
-  buttonDown: PlaydateButtonState;
-  buttonUp: PlaydateButtonState;
+  pressed: PDButtonState;
+  justPressed: PDButtonState;
+  justReleased: PDButtonState;
 };

@@ -12,7 +12,7 @@ JavaScript library for interacting with a [Panic Playdate](http://play.date/) co
  - Execute secret commands!
  - Send compiled Lua payloads over USB!
  - Extensive error handling with helpful error messages
- - Exports full Typescript types, has zero dependencies, and weighs less than 4kb minified and gzipped
+ - Exports full Typescript types, has zero dependencies, and weighs less than 5kb minified and gzipped
 
 ## Examples
 
@@ -56,12 +56,12 @@ Using an external script reference
 <script src="https://unpkg.com/pd-usb/dist/pd-usb.min.js"></script>
 <script>
   async function connectToPlaydate() {
-    const playdate = await playdateUsb.requestConnectPlaydate();
+    const playdate = await pdusb.requestConnectPlaydate();
   }
 </script>
 ```
 
-When using the library this way, a global called `playdateUsb` will be created containing all the exports from the module version.
+When using the library this way, a global called `pdusb` will be created containing all the exports from the module version.
 
 ## Usage
 
@@ -111,7 +111,7 @@ button.addEventListener('click', async() => {
 });
 ```
 
-### Open and Close a PlaydateDevice
+### Open and close a PlaydateDevice
 
 Before interacting with the device, you need to make sure that it is open for communication. This can be done by calling `PlaydateDevice`'s asynchronous `open` method, which returns a promise that resolves when the device is ready, or throws an error if a connection could not be opened.
 
@@ -125,7 +125,7 @@ await device.open();
 await device.close();
 ```
 
-### PlaydateDevice Events
+### PlaydateDevice events
 
 A `PlaydateDevice` instance will fire events when certain things happen, allowing you to write code to handle things such as the device being disconnected.
 
@@ -155,7 +155,7 @@ The following events are available:
 | `controls:update` | A new control state has been received while control-polling mode is active |
 | `controls:stop` | Control-polling mode has been stopped |
 
-### PlaydateDevice API
+### PlaydateDevice general API
 
 These methods are asynchronous and will resolve when a response has been received from the Playdate, so you need to remember to use `async/await`.
 
@@ -221,59 +221,15 @@ If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap exa
 
 #### `run`
 
-Launch a .pdx rom at a given path on the Playdate's data disk. The path must begin with a forward slash, and the device may crash if the selected rom does not exist.
+Launch a .pdx file at a given path on the Playdate's data disk. The path must begin with a forward slash, and the device may crash if the selected file does not exist.
 
 ```js
 await device.run('/System/Crayons.pdx');
 ```
 
-#### `startPollingControls`
-
-Begin polling the device for control updates. Can be stopped with `stopPollingControls()`. While control polling is active, you won't be able to communicate with the device. The `controls:update` event will be fired whenever the control state changes.
-
-```js
-device.startPollingControls();
-
-device.on('controls:update', function(state) {
-  // handle control updates here...
-  if (state.buttonDown.b) {
-    console.log('B button is pressed!');
-  }
-});
-// sometime later...
-await device.stopPollingControls();
-```
-
-This method will resolve only when control polling is stopped, so you probably don't want to call it with `await` unless you're aware of that.
-
-Please also note that disconnecting your Playdate while control polling is active can sometimes cause future USB connections to goof up for a while. This library has code that tries to fix this by clearing the input buffer, but it doesn't seem to be perfect. If this happens, try locking and unlocking your device a few times!
-
-#### `getControls`
-
-Returns the current control state, while control polling is active. Note that this method is *not* asynchronous.
-
-```js
-device.startPollingControls();
-
-const state = device.getControls();
-console.log('B button:', state.buttonDown.b);
-console.log('Crank angle:', state.crank);
-
-// sometime later...
-await device.stopPollingControls();
-```
-
-#### `stopPollingControls`
-
-Stop polling for control updates, after startPollingControls() has been called. After this has completed, you'll be able to communicate with the device again.
-
-```js
-await device.stopPollingControls();
-```
-
 #### `sendCommand`
 
-Sends a plaintext command directly to the Playdate, and returns the response as a string. You can use `await sendCommand('help')` to get a list of all available commands.
+Sends a plaintext command directly to the Playdate, and returns the response as an array of strings for each line. You can use `await sendCommand('help')` to get a list of all available commands.
 
 > ⚠️ The commands that this library wraps with functions (such as `getVersion()` or `getScreen()`) are known to be safe, are used by the Playdate Simulator, and have all been tested on actual Playdate hardware. However, some of the commands that you can potentially run with `sendCommand()` could be dangerous, and might even harm your favorite yellow handheld if you don't know what you're doing. *Please* don't execute any commands that you're unsure about!
 
@@ -287,6 +243,65 @@ Sends a compiled Lua function to the device to be evaluated. The payload must be
 const payloadData = new Uint8Array(... put your payload data here);
 await device.evalLuaPayload(payloadData);
 ```
+
+### Reading Playdate controls
+
+The Playdate can be put into a control polling mode, where it will send the current state of the buttons and crank at regular intervals. While control polling is active, you won't be able to communicate with the device.
+
+Control polling can be started with `startPollingControls()` and stopped with `stopPollingControls()`. While polling is active, the `controls:update` event will be fired whenever a new control state is received, which seems to be every time the Playdate's update loop is run.
+
+```js
+// add a controls:update event handler
+device.on('controls:update', function(state) {
+  // handle control updates here...
+  if (state.buttonDown.b) {
+    console.log('B button is pressed!');
+  }
+});
+
+// start polling controls
+await device.startPollingControls();
+
+// sometime later...
+await device.stopPollingControls();
+```
+
+Please note that disconnecting your Playdate while control polling is active can sometimes cause future USB connections to goof up for a while. This library has code that tries to fix this by clearing the input buffer, but it doesn't seem to be perfect. If this happens, try locking and unlocking your device a few times!
+
+### Getting the control state without an event
+
+You can also query the Playdate's control state at your own pace, without using events. Note that these methods will only work while control polling is active.
+
+#### `getControls()`
+
+Returns the current control state as an object containing button states and crank angle/dock state.
+
+```js
+const state = device.getControls();
+console.log('B button:', state.pressed.b);
+console.log('Crank angle:', state.crank);
+```
+
+#### `buttonIsPressed(button)`, `buttonJustPressed(button)`, `buttonJustReleased(button)`
+
+Equivalents to the Playdate SDK's [button query methods](https://sdk.play.date/1.9.3/Inside%20Playdate.html#_querying_buttons_directly).
+
+`button` should be one of the constants:
+
+- `pbusb.kButtonA`
+- `pbusb.kButtonB`
+- `pbusb.kButtonUp`
+- `pbusb.kButtonDown`
+- `pbusb.kButtonLeft`
+- `pbusb.kButtonRight`
+- `pbusb.kButtonMenu`
+- `pbusb.kButtonLock`
+
+Or one of the strings "a", "b", "up", "down", "left", "right", "menu", "lock".
+
+#### `isCrankDocked()`, `getCrankPosition()`
+
+Equivalents to the Playdate SDK's [crank query methods](https://sdk.play.date/1.9.3/Inside%20Playdate.html#_querying_crank_status_directly).
 
 ## Contributing
 

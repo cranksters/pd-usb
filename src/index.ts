@@ -2,6 +2,7 @@ export * from './PlaydateDevice';
 export * from './PlaydateTypes';
 export * from './Serial';
 
+import { PDButton } from './PlaydateTypes';
 import { PlaydateDevice } from './PlaydateDevice';
 import { assert } from './utils';
 
@@ -31,6 +32,18 @@ export async function requestConnectPlaydate() {
 }
 
 /**
- * Provides the current version of the playdate-usb library for debugging
+ * Button constants for input state methods
+ */
+export const kButtonLeft = PDButton.kButtonLeft;
+export const kButtonRight = PDButton.kButtonRight;
+export const kButtonUp = PDButton.kButtonUp;
+export const kButtonDown = PDButton.kButtonDown;
+export const kButtonB = PDButton.kButtonB;
+export const kButtonA = PDButton.kButtonA;
+export const kButtonMenu = PDButton.kButtonMenu;
+export const kButtonLock = PDButton.kButtonLock;
+
+/**
+ * Provides the current version of the pd-usb library for debugging
  */
 export const version = LIBRARY_VERSION; // replaced by @rollup/plugin-replace; see rollup.config.js

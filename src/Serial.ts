@@ -2,21 +2,8 @@ import { PDSerialMode, PDSerialTransformer } from './SerialTransformer';
 import { assert, stringToBytes, mergeByteChunks } from './utils';
 
 /**
- * Event types for PlaydateDevice - register events with on()
+ * Options for the serial connection
  */
-export type PDSerialEvent =
- | 'open'
- | 'close'
- | 'disconnect'
- | 'error'
- | 'data'
-;
-
-/**
- * Event callback function type
- */
-export type PDSerialEventCallback<T extends any[] = any[]> = (...args: T) => void;
-
 export interface PDSerialOptions {
   baudRate: number;
   bufferSize: number;
@@ -24,48 +11,32 @@ export interface PDSerialOptions {
 
 /**
  * Handles USB connection and sending data to and fro
+ * Intended to be a generic serial interface, with no specific knowledge of the playdate and its commands
  */
 export class PDSerial {
 
-  isOpen = false;
-  isReading = false;
-
   private port: SerialPort;
   private options: PDSerialOptions;
-  private events: Partial<Record<PDSerialEvent, PDSerialEventCallback[]>> = {};
   private readTransformer: PDSerialTransformer;
   private reader: ReadableStreamDefaultReader<string | Uint8Array>;
+  private errorCallback: (error: Error) => void = () => {};
+
+  isOpen = false;
+  isReading = false;
+  isWaitingForRead = false;
 
   constructor(port: SerialPort, options: PDSerialOptions) {
     this.port = port;
     this.options = options;
-    port.addEventListener('disconnect', this.handleDisconnect);
+    port.addEventListener('disconnect', this.handleDisconnectEvent);
   }
 
-  /**
-   * Register an event callback
-   */
-  on(eventType: 'data', callback: PDSerialEventCallback<[Uint8Array]>): void;
-  on(eventType: PDSerialEvent, callback: PDSerialEventCallback): void;
-  on(eventType: PDSerialEvent, callback: PDSerialEventCallback): void {
-    (this.events[eventType] || (this.events[eventType] = [])).push(callback);
+  onData(callbackFn: (data: Uint8Array) => void) {
+    this.readTransformer.onData(callbackFn);
   }
 
-  /**
-   * Remove an event callback
-   */
-  off(eventType: PDSerialEvent, callback: PDSerialEventCallback) {
-    const callbackList = this.events[eventType];
-    if (callbackList)
-      callbackList.splice(callbackList.indexOf(callback), 1);
-  }
-
-  /**
-   * Emit an event
-   */
-  emit(eventType: PDSerialEvent, ...args: any[]) {
-    const callbackList = this.events[eventType] || [];
-    callbackList.forEach(fn => fn.apply(this, args));
+  onError(callbackFn: (error: Error) => void) {
+    this.errorCallback = callbackFn;
   }
 
   /**
@@ -78,21 +49,19 @@ export class PDSerial {
     const stream = readable.pipeThrough(new TransformStream(this.readTransformer));
     this.reader = stream.getReader();
     this.isOpen = true;
-    this.emit('open');
   }
 
   /**
    * Closes the serial device, stopping communication
    */
   async close() {
+    await this.reader.cancel();
     await this.port.close();
     this.isOpen = false;
-    // this.stopReadingLoop();
-    this.emit('close');
   }
 
   /**
-   * Send a Uint8Array to the serial device
+   * Sends an Uint8Array to the serial device
    */
   async write(bytes: Uint8Array) {
     assert(this.isOpen, 'Serial is not open, please call open() before beginning to write data');
@@ -109,48 +78,83 @@ export class PDSerial {
     return await this.write(bytes);
   }
 
-  async readBytes(num = 0) {
+  /**
+   * Reads an Uint8Array from the serial device
+   * If numBytes is 0, it will resolve as soon as some bytes are received
+   * If numBytes is more than 0, it will resolved when *at least* that many bytes have been received -- the actual buffer could be a bit longer
+   */
+  async readBytes(numBytes = 0): Promise<Uint8Array> {
+    assert(!this.isReading, 'A read was queued while another was still in progress');
+    this.isReading = true;
     try {
       this.readTransformer.setMode(PDSerialMode.Bytes);
-      this.readTransformer.bytesTarget = num;
+      this.readTransformer.bytesTarget = numBytes;
       const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<Uint8Array>;
       this.readTransformer.bytesTarget = 0;
+      this.isReading = false;
       return value;
     }
     catch (error) {
-      this.emit('error', error);
+      this.isReading = false;
+      this.errorCallback(error);
     }
   }
 
-  async readLine() {
+  /**
+   * Clear the current reader.read() call that's being awaited, to prevent it from blocking further reads...
+   */
+  async clearRead() {
+    if (this.port.readable && this.isWaitingForRead) {
+      this.readTransformer.clearOut();
+      this.isWaitingForRead = false;
+    }
+  }
+
+  /**
+   * Reads a single line of ascii text from the serial device
+   * Newline characters are not included, some lines may be empty
+   */
+  async readLine(): Promise<string> {
+    assert(!this.isReading, 'A read was queued while another was still in progress');
+    this.isReading = true;
     try {
       this.readTransformer.setMode(PDSerialMode.Lines);
       const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<string>;
+      this.isReading = false;
       return value;
     }
     catch (error) {
-      this.emit('error', error);
+      this.isReading = false;
+      this.errorCallback(error);
     }
   }
-
+  
+  
+  /**
+   * Do one of the above read functions, but make it timeout after a given number of milliseconds
+   * This is used to read everything until the device has nothing more to send
+   */
   async doReadWithTimeout<T = Uint8Array | string>(
     timeoutMs: number,
     readFn: (...args: any[]) => Promise<T>,
     ...readFnArgs: any[]
   ) {
     return new Promise<{ value: T, done: boolean }>((resolve, reject) => {
-      
+      this.isWaitingForRead = true;
+
       const timer = setTimeout(() => {
         resolve({ value: null, done: true });
         // this is SUPER IMPORTANT, the readFn that has timed out still needs to complete somehow,
         // otherwise it will just block further reads
         // I imagine there's a nicer way to handle this, but I can't find any good information out there...
-        this.readTransformer.clearOut();
+        this.clearRead();
       }, timeoutMs);
 
       try {
         readFn.bind(this)(...readFnArgs).then((result: any) => {
           clearTimeout(timer);
+          console.log('read cancelled');
+          this.isWaitingForRead = false;
           resolve({ value: result, done: false });
         });
       }
@@ -161,8 +165,11 @@ export class PDSerial {
     });
   }
 
+  /**
+   * Read lines until a timeout happens, indicating there's no more lines to read for now
+   */
   async readLinesUntilTimeout(ms = 50) {
-    let lines:string[] = [];
+    const lines: string[] = [];
     while (this.isOpen && this.port.readable) {
       try {
         const { value, done } = await this.doReadWithTimeout(ms, this.readLine);
@@ -172,13 +179,16 @@ export class PDSerial {
           return lines;
       } 
       catch (error) {
-        this.emit('error', error);
+        this.errorCallback(error);
       }
     }
   }
 
+  /**
+   * Read bytes until a timeout happens, indicating there's no more bytes to read for now
+   */
   async readBytesUntilTimeout(ms = 50) {
-    let chunks: Uint8Array[] = [];
+    const chunks: Uint8Array[] = [];
     while (this.isOpen && this.port.readable) {
       try {
         const { value, done } = await this.doReadWithTimeout(ms, this.readBytes);
@@ -188,15 +198,13 @@ export class PDSerial {
           return mergeByteChunks(chunks);
       } 
       catch (error) {
-        this.emit('error', error);
+        this.errorCallback(error);
       }
     }
   }
 
-  private handleDisconnect = () => {
+  private handleDisconnectEvent = () => {
     this.isOpen = false;
     this.isReading = false;
-    this.emit('disconnect');
-    console.log('disconnected', this);
   }
 }
