@@ -16,7 +16,11 @@ JavaScript library for interacting with a [Panic Playdate](http://play.date/) co
 
 ## Examples
 
-> ⚠️ TODO: list examples
+ - [Basic Connection](https://jaames.github.io/pd-usb/example-basic.html)
+ - [Input State Capture](https://jaames.github.io/pd-usb/example-controller.html)
+ - [Screenshot Capture](https://jaames.github.io/pd-usb/example-screen.html)
+ - [Send Bitmap](https://jaames.github.io/pd-usb/example-send-bitmap.html)
+ - [Execute Lua Payload](https://jaames.github.io/pd-usb/example-eval.html)
 
 ## Installation
 
