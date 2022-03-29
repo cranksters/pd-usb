@@ -153,7 +153,6 @@ export class PDSerial {
       try {
         readFn.bind(this)(...readFnArgs).then((result: any) => {
           clearTimeout(timer);
-          console.log('read cancelled');
           this.isWaitingForRead = false;
           resolve({ value: result, done: false });
         });
