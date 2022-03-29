@@ -1,25 +1,31 @@
-import { Serial } from './Serial';
+import { PDSerial } from './Serial';
 
 import {
-  PlaydateVersion,
-  PlaydateButton,
-  PlaydateButtonBitmask,
-  PlaydateButtonState,
-  PlaydateControlState
+  PDVersion,
+  PDButton,
+  PDButtonName,
+  PDButtonNameMap,
+  PDButtonBitmaskMap,
+  PDButtonState,
+  PDControlState
 } from './PlaydateTypes';
 
 import {
   assert,
-  splitLines,
   parseKeyVal,
-  bytesToString,
   stringToBytes,
-  sleep
+  bytesPos,
 } from './utils';
 
 // Playdate USB vendor and product IDs
 export const PLAYDATE_VID = 0x1331;
 export const PLAYDATE_PID = 0x5740;
+
+export const USB_FILTER = { usbVendorId: PLAYDATE_VID, usbProductId: PLAYDATE_PID };
+
+// Serial settings
+export const PLAYDATE_BAUDRATE = 115200;
+export const PLAYDATE_BUFFER_SIZE = 12800;
 
 // Playdate screen dimensions
 export const PLAYDATE_WIDTH = 400;
@@ -28,74 +34,96 @@ export const PLAYDATE_HEIGHT = 240;
 /**
  * Event types for PlaydateDevice - register events with on()
  */
-export type PlaydateEvent =
+export type PlaydateDeviceEvent =
  | 'open'
  | 'close'
  | 'disconnect'
  | 'controls:start'
  | 'controls:update'
  | 'controls:stop'
+ | 'data'
+ | 'print'
+ | 'error'
 ;
 
 /**
  * Event callback function type
  */
-export type PlaydateEventCallback<T extends any[] = []> = (...args: T) => void;
+export type PlaydateDeviceEventCallback<T extends any[] = any[]> = (...args: T) => void;
 
 /**
  * Represents a Playdate device connected over USB, and provides some methods for communicating with it
  */
 export class PlaydateDevice {
 
-  device: USBDevice;
-  serial: Serial;
+  port: SerialPort;
+  serial: PDSerial;
 
   isConnected: boolean =  true;
   isPollingControls: boolean = false;
   isStreaming: boolean = false;
-  lastControlState: PlaydateControlState;
+  lastControlState: PDControlState;
+  lastButtonPressedFlags: number = 0;
+  lastButtonJustReleasedFlags: number = 0;
+  lastButtonJustPressedFlags: number = 0;
 
   logCommandResponse: boolean = false;
 
-  events: Partial<Record<PlaydateEvent, PlaydateEventCallback[]>> = {};
+  events: Partial<Record<PlaydateDeviceEvent, PlaydateDeviceEventCallback[]>> = {};
 
-  constructor(device: USBDevice) {
-    this.device = device;
-    this.serial = new Serial(device);
-    // watch for when this device disconnects
-    navigator.usb.addEventListener('disconnect', async (e) => {
-      if (e.device === this.device) {
-        this.isConnected = false;
-        this.emit('disconnect');
-      }
+  constructor(port: SerialPort) {
+    this.port = port;
+    this.serial = new PDSerial(port, {
+      baudRate: PLAYDATE_BAUDRATE,
+      bufferSize: PLAYDATE_BUFFER_SIZE
     });
+    this.port.addEventListener('disconnect', this.handleDisconnectEvent);
+  }
+
+  static async requestDevice() {
+    const port = await navigator.serial.requestPort({ filters: [USB_FILTER] });
+    return new PlaydateDevice(port);
+  }
+
+  static async getDevices() {
+    const ports = await navigator.serial.getPorts();
+    return ports
+      .filter(port => {
+        const { usbProductId, usbVendorId } = port.getInfo();
+        return usbProductId === PLAYDATE_PID && usbVendorId === PLAYDATE_VID;
+      })
+      .map(port => new PlaydateDevice(port));
   }
 
   /**
    * Indicates whether the Playdate is open or close to reading/writing
    */
   get isOpen() {
-    return this.serial.isOpen;
+    return this.isConnected && this.serial.isOpen;
   }
 
   /**
    * Indicates when the Playdate is busy and not able to handle other commands
    */
   get isBusy() {
-    return this.isPollingControls || this.isStreaming;
+    return this.isConnected && (this.isPollingControls || this.isStreaming);
   }
 
   /**
    * Register an event callback
    */
-  on(eventType: PlaydateEvent, callback: PlaydateEventCallback): void {
+  on(eventType: 'data', callback: PlaydateDeviceEventCallback<[Uint8Array]>): void;
+  on(eventType: 'print', callback: PlaydateDeviceEventCallback<[string]>): void;
+  on(eventType: 'error', callback: PlaydateDeviceEventCallback<[Error]>): void;
+  on(eventType: PlaydateDeviceEvent, callback: PlaydateDeviceEventCallback): void;
+  on(eventType: PlaydateDeviceEvent, callback: PlaydateDeviceEventCallback): void {
     (this.events[eventType] || (this.events[eventType] = [])).push(callback);
   }
 
   /**
    * Remove an event callback
    */
-  off(eventType: PlaydateEvent, callback: PlaydateEventCallback) {
+  off(eventType: PlaydateDeviceEvent, callback: PlaydateDeviceEventCallback) {
     const callbackList = this.events[eventType];
     if (callbackList)
       callbackList.splice(callbackList.indexOf(callback), 1);
@@ -104,7 +132,7 @@ export class PlaydateDevice {
   /**
    * Emit an event
    */
-  emit(eventType: PlaydateEvent, ...args: any[]) {
+  emit(eventType: PlaydateDeviceEvent, ...args: any[]) {
     const callbackList = this.events[eventType] || [];
     callbackList.forEach(fn => fn.apply(this, args));
   }
@@ -114,9 +142,15 @@ export class PlaydateDevice {
    */
   async open() {
     await this.serial.open();
-    await this.forceInputClear();
+    this.serial.onData(this.handleSerialDataEvent);
+    this.serial.onError(this.handleSerialErrorEvent);
     // we want echo to be off by default (playdate simulator does this first)
-    await this.setEcho('off');
+    const lines = await this.sendCommand(`echo off`);
+    assert(Array.isArray(lines), 'Open error - Playdate did not respond, maybe something else is interacting with it?');
+    const resp = lines.pop();
+    // echo off should respond with nothing but a blank line
+    // if echo was previously set to on, it will echo the given command one last time in response
+    assert(resp === '' || resp.includes('echo off'), `Open error - invalid echo command response, got ${ resp }`);
     this.emit('open');
   }
 
@@ -125,7 +159,6 @@ export class PlaydateDevice {
    */
   async close() {
     // seems to help if the session goofed up and the device is still trying to send data
-    await this.serial.clear();
     // stop any continually running commands
     if (this.isPollingControls)
       await this.stopPollingControls();
@@ -137,9 +170,8 @@ export class PlaydateDevice {
   /**
    * Get version information about the Playdate; its OS build info, SDK version, serial number, etc 
    */
-  async getVersion(): Promise<PlaydateVersion> {
-    const str = await this.sendCommand('version');
-    const lines = splitLines(str);
+  async getVersion(): Promise<PDVersion> {
+    const lines = await this.sendCommand('version');
     const parsed: Record<string, string> = {};
     // split key=value lines into object
     lines.forEach(line => {
@@ -171,28 +203,8 @@ export class PlaydateDevice {
    * Get the Playdate's serial number
    */
   async getSerial() {
-    const str = await this.sendCommand('serialread');
-    return str.trim();
-  }
-
-  /**
-   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as a string
-   */
-  async getConsoleOutput() {
-    const str = await this.sendCommand('eval');
-    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
-    return str.trim();
-  }
-
-  /**
-   * Get any data that has been printed to the Playdate's console output (e.g. via print() in Lua, playdate->system->logToConsole() in C, etc) as an Uint8Array of bytes
-   */
-  async getRawConsoleOutput() {
-    await this.serial.writeAscii('eval\n');
-    const bytes = await this.serial.read();
-    const str = bytesToString(bytes.subarray(0, 40));
-    assert(!str.includes('Lua runtime is not available'), 'Console output cannot be read, the currently loaded PDX may be a system application');
-    return bytes;
+    const lines = await this.sendCommand('serialread');
+    return lines.find(line => line !== '');
   }
 
   /**
@@ -203,11 +215,13 @@ export class PlaydateDevice {
   async getScreen() {
     this.assertNotBusy();
     await this.serial.writeAscii('screen\n');
-    const bytes = await this.serial.read();
+    const bytes = await this.serial.readBytes(12011);
     assert(bytes.byteLength >= 12011, `Screen command response is too short, got ${ bytes.byteLength } bytes`);
-    const header = bytesToString(bytes.subarray(0, 11));
-    const frameBuffer = bytes.subarray(11, 12011);
-    assert(header.includes('~screen:'), 'Invalid screen command response');
+    const header = stringToBytes('~screen:\n');
+    let ptr = bytesPos(bytes, header);
+    assert(ptr !== -1, 'Invalid screen command response');
+    ptr += header.length;
+    const frameBuffer = bytes.subarray(ptr, ptr + 12000);
     return frameBuffer;
   }
 
@@ -244,8 +258,8 @@ export class PlaydateDevice {
     bytes.set(stringToBytes('bitmap\n'), 0);
     bytes.set(bitmap, 7);
     await this.serial.write(bytes);
-    const str = await this.serial.readAscii();
-    assert(str === '\r\n', `Invalid bitmap send response, got ${ str }`);
+    const [str] = await this.serial.readLinesUntilTimeout();
+    assert(str === '', `Invalid bitmap send response, got ${ str }`);
   }
 
   /**
@@ -281,28 +295,9 @@ export class PlaydateDevice {
     this.assertNotBusy();
     await this.serial.writeAscii('buttons\n');
     this.emit('controls:start');
-    this.isPollingControls = true;
     // isPollingControls will be set to false when stopPollingControls() is called
-    while (this.isPollingControls) {
-      try {
-        const str = await this.serial.readAscii();
-        const state = this.parseControlState(str);
-        if (state) {
-          this.lastControlState = state;
-          this.emit('controls:update', state);
-        }
-      }
-      catch(e) {
-        // if isPollingControls is false, that means stopPollingControls() was called, 
-        // and we can ignore this error because it cancels any ongoing transfers
-        // if it's still true, it means something actually went wrong
-        if (this.isPollingControls)
-          throw e;
-      }
-    }
-    // only reached when stopped
-    this.emit('controls:stop');
-    return true;
+    this.isPollingControls = true;
+    this.pollControlsLoop();
   }
 
   /**
@@ -314,14 +309,62 @@ export class PlaydateDevice {
   }
 
   /**
+   * Equivalent to Playdate SDK's playdate.buttonIsPressed(button)
+   */
+  buttonIsPressed(button: PDButton | PDButtonName) {
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    if (typeof(button) === 'string')
+      button = PDButtonBitmaskMap[button];
+    return (this.lastButtonPressedFlags & button) !== 0;
+  }
+
+  /**
+   * Equivalent to Playdate SDK's playdate.buttonJustPressed(button)
+   */
+  buttonJustPressed(button: PDButton | PDButtonName) {
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    if (typeof(button) === 'string')
+      button = PDButtonBitmaskMap[button];
+    return (this.lastButtonJustPressedFlags & button) !== 0;
+  }
+
+  /**
+   * Equivalent to Playdate SDK's playdate.buttonJustReleased(button)
+   */
+  buttonJustReleased(button: PDButton | PDButtonName) {
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    if (typeof(button) === 'string')
+      button = PDButtonBitmaskMap[button];
+    return (this.lastButtonJustReleasedFlags & button) !== 0;
+  }
+
+  /**
+   * Equivalent to Playdate SDK's playdate.isCrankDocked()
+   */
+  isCrankDocked() {
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    return this.lastControlState.crankDocked;
+  }
+
+  /**
+   * Equivalent to Playdate SDK's playdate.getCrankPosition()
+   */
+  getCrankPosition() {
+    assert(this.isPollingControls, 'Please begin polling Playdate controls by calling startPollingControls() first');
+    return this.lastControlState.crank;
+  }
+
+  /**
    * Stop polling for control updates, after startPollingControls() has been called
    * After this has completed, you'll be able to communicate with the device again
    */
   async stopPollingControls() {
     assert(this.isPollingControls, 'Controls are not currently being polled');
     await this.serial.writeAscii('\n');
-    await this.serial.clear();
     this.lastControlState = undefined;
+    this.lastButtonPressedFlags = 0;
+    this.lastButtonJustReleasedFlags = 0;
+    this.lastButtonJustPressedFlags = 0;
     this.isPollingControls = false;
   }
 
@@ -330,21 +373,20 @@ export class PlaydateDevice {
    */
   async run(path: string) {
     assert(path.startsWith('/'), 'Path must begin with a forward slash, e.g. "/System/Crayons.pdx"')
-    const str = await this.sendCommand(`run ${ path }`);
-    assert(str === '\r\n', `Invalid run response, got ${ str }`);
+    const [str] = await this.sendCommand(`run ${ path }`);
+    assert(str === '', `Invalid run response, got ${ str }`);
   }
 
   /**
    * Eval a pre-compiled lua function payload (has to be compiled with pdc) on the device
    */
-  async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 200) {
+  async evalLuaPayload(payload: Uint8Array | ArrayBufferLike, waitTime = 50) {
     const cmd = `eval ${ payload.byteLength }\n`;
     const data = new Uint8Array(cmd.length + payload.byteLength);
     data.set(stringToBytes(cmd), 0);
     data.set(new Uint8Array(payload), cmd.length);
     await this.serial.write(data);
-    await sleep(waitTime);
-    return await this.serial.readAscii();
+    return await this.serial.readLinesUntilTimeout(waitTime);
   }
 
   // not quite working yet
@@ -379,93 +421,93 @@ export class PlaydateDevice {
    * Some commands are potentially dangerous and could harm your Playdate. *Please* don't execute any commands that you're unsure about!
    */
   async sendCommand(command: string) {
+    assert(this.isOpen);
     this.assertNotBusy();
     await this.serial.writeAscii(`${ command }\n`);
-    const str = await this.serial.readAscii();
+    const lines = await this.serial.readLinesUntilTimeout();
     if (this.logCommandResponse) {
-      const lines = splitLines(str);
       console.log(lines.join('\n'));
     }
-    return str;
+    return lines;
+  }
+
+  private handleDisconnectEvent = () => {
+    this.isConnected = false;
+    this.emit('disconnect');
+  }
+
+  private handleSerialDataEvent = (data: Uint8Array) => {
+    this.emit('data', data);
+  }
+
+  private handleSerialErrorEvent = (err: Error) => {
+    this.emit('error', err);
+    throw err;
   }
 
   /**
-   * This will clear out the input buffer if the device was still in button/streaming mode or wasn't properly closed
+   * Continually read lines while control polling is active
+   * Probably don't want to call this with await so that it doesn't lock everything
    */
-  async forceInputClear() {
-    while (true) {
-      await this.serial.writeAscii('\n'); // newline cancels button/streaming mode
-      const str = await this.serial.readAscii();
-      if (str.includes('Unknown command'))
-        break;
+  private async pollControlsLoop() {
+    while (this.isPollingControls && this.port.readable) {
+      try {
+        const line = await this.serial.readLine();
+        const state = this.parseControlState(line);
+        if (state) {
+          this.emit('controls:update', state);
+        }
+      }
+      catch(e) {
+        // if isPollingControls is false, that means stopPollingControls() was called, 
+        // and we can ignore this error because it cancels any ongoing transfers
+        // if it's still true, it means something actually went wrong
+        if (this.isPollingControls)
+          throw e;
+      }
     }
-  }
-
-  /**
-   * Set the console echo state. By default, this is set to 'off' while opening the device
-   */
-  private async setEcho(echoState: 'on' | 'off') {
-    const str = await this.sendCommand(`echo ${ echoState }`);
-    if (echoState === 'off') {
-      // echo off should respond with nothing but a blank line
-      // if echo was previously set to on, it will echo the given command one last time in response
-      assert(str.startsWith('\r\n') || str.includes('echo off'), `Invalid echo command response, got ${ str }`);
-    }
+    // only reached when stopped
+    this.emit('controls:stop');
   }
 
   private assertNotBusy() {
     assert(!this.isBusy, 'Device is currently busy, stop polling controls or streaming to send further commands');
   }
 
-  private parseControlState(state: string): PlaydateControlState {
+  private parseControlState(state: string): PDControlState {
     const parsed = state.match(/buttons:([A-F0-9]{2}) ([A-F0-9]{2}) ([A-F0-9]{2}) crank:(\d+\.?\d+) docked:(\d)/);
     if (parsed) {
-      const buttonFlags = parseInt(parsed[1], 16);
-      const buttonDownFlags = parseInt(parsed[2], 16);
-      const buttonUpFlags = parseInt(parsed[3], 16);
-      const crank = parseFloat(parsed[4]);
-      const crankDocked = parsed[5] === '1';
-      return {
+      const pressed =      parseInt(parsed[1], 16);
+      const justPressed =  parseInt(parsed[2], 16);
+      const justReleased = parseInt(parsed[3], 16);
+      const crank =        parseFloat(parsed[4]);
+      const crankDocked =  parsed[5] === '1';
+      const state = {
         crank,
         crankDocked,
-        button: this.parseButtonFlags(buttonFlags),
-        buttonDown: this.parseButtonFlags(buttonDownFlags),
-        buttonUp: this.parseButtonFlags(buttonUpFlags),
+        pressed: this.parseButtonFlags(pressed),
+        justPressed: this.parseButtonFlags(justPressed),
+        justReleased: this.parseButtonFlags(justReleased),
       };
+      this.lastButtonPressedFlags = pressed;
+      this.lastButtonJustPressedFlags = justPressed;
+      this.lastButtonJustReleasedFlags = justReleased;
+      this.lastControlState = state;
+      return state;
     }
     return;
   }
 
-  private parseButtonFlags(flags: number): PlaydateButtonState {
-    const masks = PlaydateButtonBitmask;
+  private parseButtonFlags(flags: number): PDButtonState {
     return {
-      [PlaydateButton.kButtonRight]: (flags & masks[PlaydateButton.kButtonRight]) !== 0,
-      [PlaydateButton.kButtonLeft]:  (flags & masks[PlaydateButton.kButtonLeft])  !== 0,
-      [PlaydateButton.kButtonUp]:    (flags & masks[PlaydateButton.kButtonUp])    !== 0,
-      [PlaydateButton.kButtonDown]:  (flags & masks[PlaydateButton.kButtonDown])  !== 0,
-      [PlaydateButton.kButtonB]:     (flags & masks[PlaydateButton.kButtonB])     !== 0,
-      [PlaydateButton.kButtonA]:     (flags & masks[PlaydateButton.kButtonA])     !== 0,
-      [PlaydateButton.kButtonMenu]:  (flags & masks[PlaydateButton.kButtonMenu])  !== 0,
-      [PlaydateButton.kButtonLock]:  (flags & masks[PlaydateButton.kButtonLock])  !== 0,
-    }
+      [PDButtonNameMap[PDButton.kButtonRight]]: (flags & PDButton.kButtonRight) !== 0,
+      [PDButtonNameMap[PDButton.kButtonLeft]]:  (flags & PDButton.kButtonLeft)  !== 0,
+      [PDButtonNameMap[PDButton.kButtonUp]]:    (flags & PDButton.kButtonUp)    !== 0,
+      [PDButtonNameMap[PDButton.kButtonDown]]:  (flags & PDButton.kButtonDown)  !== 0,
+      [PDButtonNameMap[PDButton.kButtonB]]:     (flags & PDButton.kButtonB)     !== 0,
+      [PDButtonNameMap[PDButton.kButtonA]]:     (flags & PDButton.kButtonA)     !== 0,
+      [PDButtonNameMap[PDButton.kButtonMenu]]:  (flags & PDButton.kButtonMenu)  !== 0,
+      [PDButtonNameMap[PDButton.kButtonLock]]:  (flags & PDButton.kButtonLock)  !== 0,
+    } as PDButtonState;
   }
-
-  /**
-   * Send an ESP-AT command to the ESP-32 firmware
-   * https://docs.espressif.com/projects/esp-at/en/latest/Get_Started/What_is_ESP-AT.html
-   * NOTE: these could potentially be very dangerous, use this function at your own peril!
-   */
-  // async sendEspCommand(command: string) {
-  //   this.assertNotBusy();
-  //   await this.serial.writeAscii(`esp ${ command }\n`);
-  //   let i = 0;
-  //   while (i < 10) {
-  //     const str = await this.serial.readAscii();
-  //     console.log(str);
-  //     if (str.includes('OK') || str.includes('ERROR'))
-  //       break;
-  //     await sleep(100);
-  //     i++;
-  //   }
-  // }
 }

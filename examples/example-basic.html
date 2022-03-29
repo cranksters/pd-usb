@@ -4,20 +4,20 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playdate USB demo</title>
+  <title>PD-USB Demo - Basic Connection</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <script src="./pd-usb.js"></script>
 </head>
 <body>
   <div class="wrapper">
     <header>
-      <h1>Playdate USB demo</h1>
+      <h1>PD-USB Demo - Basic Connection</h1>
     </header>
     <main>
       <div class="panel">
         <div class="row">
           <div class="pull-left">
-            <button onclick="connect()" id="connectButton"> connect to playdate </button>
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
             <span id="serial"></span>
           </div>
         </div>
@@ -30,7 +30,7 @@
         <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-basic.html">page source</a>
       </div>
       <div class="pull-right">
-        built by <a href="//github.com/jaames">james daniel</a>
+        built by <a href="//github.com/jaames">jaames</a>
       </div>
     </footer>
   </div>
@@ -40,9 +40,9 @@
 
     const data = document.getElementById('data');
     
-    // Check WebUSB support, display error if not supported
+    // Check WebSerial support, display error if not supported
     try {
-      playdateUsb.assertUsbSupported();
+      pdusb.assertUsbSupported();
     }
     catch (e) {
       document.getElementById('serial').innerHTML = e.message;
@@ -51,7 +51,7 @@
 
     async function connect() {
       try {
-        device = await playdateUsb.requestConnectPlaydate();
+        device = await pdusb.requestConnectPlaydate();
           
         await device.open();
         const serial = await device.getSerial();

@@ -1,5 +1,7 @@
 # Debug stuff
 playdate_usb_captures
+# web files
+www/**/*
 
 # lockfiles not needed for library
 yarn.lock

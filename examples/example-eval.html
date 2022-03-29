@@ -4,27 +4,30 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playdate USB demo</title>
+  <title>PD-USB Demo - Execute Lua Payload</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <script src="./pd-usb.js"></script>
 </head>
 <body>
   <div class="wrapper">
     <header>
-      <h1>Playdate USB demo - eval</h1>
+      <h1>PD-USB Demo - Execute Lua Payload</h1>
     </header>
     <main>
       <div class="panel">
         <div class="row">
           <div class="pull-left">
-            <button onclick="connect()" id="connectButton"> connect to playdate </button>
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
             <span id="serial"></span>
           </div>
         </div>
       </div>
       <div class="panel" id="data">
         <p>
-          This example uses evalLuaPayload() to send a compiled Lua payload over USB and execute it on your Playdate - as long as the current application is not a system app. This payload is designed to print all fo the global variables from the current app's lua runtime, the code is: 
+          This example uses evalLuaPayload() to send a compiled Lua payload over USB and execute it on your Playdate, as long as the current application is not a system app.
+        </p>
+        <p>
+          The payload is designed to print all of the global variables from the current app's Lua runtime, the code is: 
           <pre>for n in pairs(_G) do print(n) end</pre>
         </p>
       </div>
@@ -34,7 +37,7 @@
         <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-basic.html">page source</a>
       </div>
       <div class="pull-right">
-        built by <a href="//github.com/jaames">james daniel</a>
+        built by <a href="//github.com/jaames">jaames</a>
       </div>
     </footer>
   </div>
@@ -44,9 +47,9 @@
 
     const data = document.getElementById('data');
     
-    // Check WebUSB support, display error if not supported
+    // Check WebSerial support, display error if not supported
     try {
-      playdateUsb.assertUsbSupported();
+      pdusb.assertUsbSupported();
     }
     catch (e) {
       document.getElementById('serial').innerHTML = e.message;
@@ -64,7 +67,7 @@
 
     async function connect() {
       try {
-        device = await playdateUsb.requestConnectPlaydate();
+        device = await pdusb.requestConnectPlaydate();
         // device setup
         await device.open();
         const serial = await device.getSerial();
@@ -76,7 +79,7 @@
         const consoleData = await runPayload(device);
         document.getElementById('data');
         data.innerHTML += "<b>results:</b>";
-        data.innerHTML += consoleData.split('\n').join('</br>');
+        data.innerHTML += consoleData.join('</br>');
         console.log(consoleData);
       }
       catch(e) {

@@ -17,24 +17,3 @@ export function parseKeyVal(str: string) {
 export function splitLines(str: string) {
   return str.split(/[\r\n]+/).filter(ln => ln !== '')
 }
-
-/**
- * Convert an Uint8Array of bytes to an ascii string
- */
-export function bytesToString(bytes: Uint8Array) {
-  let result = '';
-  const size = bytes.byteLength;
-  for (let i = 0; i < size; i++)
-    result += String.fromCharCode(bytes[i]);
-  return result;
-}
-
-/**
- * Convert an ascii string to an Uint8Array of bytes
- */
-export function stringToBytes(str: string) {
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++)
-    bytes[i] = str.charCodeAt(i);
-  return bytes;
-}

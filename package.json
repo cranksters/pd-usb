@@ -1,7 +1,7 @@
 {
   "name": "pd-usb",
-  "version": "1.0.0",
-  "description": "JavaScript library for interacting with a Playdate console over USB, wherever webUSB is supported. Not officially supported by or affiliated with Panic.",
+  "version": "2.0.0",
+  "description": "JavaScript library for interacting with a Playdate console over USB, wherever WebSerial is supported. Not officially supported by or affiliated with Panic.",
   "module": "dist/pd-usb.es.js",
   "main": "dist/pd-usb.js",
   "types": "dist/pd-usb.d.ts",
@@ -41,9 +41,10 @@
     "playdate",
     "usb",
     "webusb",
+    "webserial",
+    "serial",
     "handheld",
     "device",
-    "reversing",
     "reverse-engineering"
   ],
   "repository": {

@@ -30,7 +30,7 @@ module.exports = {
     (isEsmoduleBuild) && {
       file: 'dist/pd-usb.es.js',
       format: 'es',
-      name: 'playdateUsb',
+      name: 'pdusb',
       exports: 'named',
       banner: banner,
       sourcemap: devserver ? true : false,
@@ -39,7 +39,7 @@ module.exports = {
     (!isEsmoduleBuild) && {
       file: isProdBuild ? 'dist/pd-usb.min.js' : 'dist/pd-usb.js',
       format: 'umd',
-      name: 'playdateUsb',
+      name: 'pdusb',
       exports: 'named',
       banner: banner,
       sourcemap: devserver ? true : false,
