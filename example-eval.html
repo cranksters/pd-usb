@@ -58,7 +58,7 @@
 
     async function runPayload(device) {
       // fetch the payload - this is a PDC-compiled lua payload extracted from a .PDZ file
-      const resp = await fetch('./patch_fps.luac');
+      const resp = await fetch('./eval_payload.luac');
       // get its contents as an ArrayBuffer
       const payload = await resp.arrayBuffer();
       // send it to the Playdate
