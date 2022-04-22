@@ -1,10 +1,10 @@
 {
   "name": "pd-usb",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "JavaScript library for interacting with a Playdate console over USB, wherever WebSerial is supported. Not officially supported by or affiliated with Panic.",
   "module": "dist/pd-usb.es.js",
   "main": "dist/pd-usb.js",
-  "types": "dist/pd-usb.d.ts",
+  "types": "dist/index.d.ts",
   "scripts": {
     "prepublishOnly": "npm run build",
     "postpublish": "./deploy.sh",
