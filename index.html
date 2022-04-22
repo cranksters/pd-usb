@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD-USB demos</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./pd-usb.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>PD-USB demos</h1>
+    </header>
+    <main>
+      <div class="panel">
+        <h2>Examples</h2>
+        <div class="example-list">
+          <a class="example-item" href="./example-basic.html">
+            <h3>Basic Connection</h3>
+            <p>Demonstrates basic USB connection to a Playdate, and how to get its serial number and firmware version</p>
+          </a>
+          <a class="example-item" href="./example-controller.html">
+            <h3>Input State Capture</h3>
+            <p>Begins input polling mode, which gives the state of the Playdate's buttons and crank at regular intervals</p>
+          </a>
+          <a class="example-item" href="./example-screen.html">
+            <h3>Screenshot Capture</h3>
+            <p>Captures an image of the Playdate's screen, and renders it to a HTML canvas element</p>
+          </a>
+          <a class="example-item" href="./example-send-bitmap.html">
+            <h3>Send Bitmap</h3>
+            <p>Sends a bitmap image to quickly preview it on the Playdate's screen</p>
+          </a>
+          <a class="example-item" href="./example-eval.html">
+            <h3>Execute Lua Payload</h3>
+            <p>Sends a pre-compiled Lua payload to the Playdate an executes it</p>
+          </a>
+        </div>
+      </div>
+    </main>
+    <footer class="row">
+      <div class="pull-left">
+        <a href="//github.com/jaames/pd-usb">pd-usb</a>
+      </div>
+      <div class="pull-right">
+        built by <a href="//github.com/jaames">jaames</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

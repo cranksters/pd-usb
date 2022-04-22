@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD-USB Demo - Basic Connection</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./pd-usb.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>PD-USB Demo - Basic Connection</h1>
+    </header>
+    <main>
+      <div class="panel">
+        <div class="row">
+          <div class="pull-left">
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
+            <span id="serial"></span>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="data">
+      </div>
+    </main>
+    <footer class="row">
+      <div class="pull-left">
+        <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-basic.html">page source</a>
+      </div>
+      <div class="pull-right">
+        built by <a href="//github.com/jaames">jaames</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    var device;
+
+    const data = document.getElementById('data');
+    
+    // Check WebSerial support, display error if not supported
+    try {
+      pdusb.assertUsbSupported();
+    }
+    catch (e) {
+      document.getElementById('serial').innerHTML = e.message;
+      document.getElementById('connectButton').disabled = true;
+    }
+
+    async function connect() {
+      try {
+        device = await pdusb.requestConnectPlaydate();
+          
+        await device.open();
+        const serial = await device.getSerial();
+
+        const versionData = await device.getVersion();
+        data.innerHTML = '';
+
+        for (let key in versionData) {
+          data.innerHTML += `<div><b>${ key }</b>: ${ versionData[key] }</div>`;
+        }
+        
+        document.getElementById('serial').innerHTML = `Connected to Playdate ${ serial }`;
+
+        device.on('disconnect', () => {
+          document.getElementById('serial').innerHTML = 'Playdate disconnected';
+        });
+      }
+      catch(e) {
+        console.warn(e.message);
+        document.getElementById('serial').innerHTML = 'Error connecting to Playdate, try again';
+      }
+    }
+  </script>
+</body>
+</html>

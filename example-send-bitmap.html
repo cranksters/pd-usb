@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD-USB Demo - Send Bitmap</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <script src="./pd-usb.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>PD-USB Demo - Send Bitmap</h1>
+    </header>
+    <main>
+      <div class="panel">
+        <div class="row">
+          <div class="pull-left">
+            <button onclick="connect()" id="connectButton"> Connect to Playdate </button>
+            <span id="serial"></span>
+          </div>
+          <div class="pull-right">
+            <button onclick="sendBitmap()" id="sendButton" disabled> Send bitmap </button>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="data">
+        <p>Draw something here, then click 'Send bitmap'</p>
+        <canvas id="canvas"></canvas>
+        <p>
+          <b>pen color:</b> <a onclick="setColor(0)">black</a> | <a onclick="setColor(1)">white</a>
+        </p>
+        <p>
+          <b>pen size:</b> <a onclick="setSize(1)">1</a> | <a onclick="setSize(2)">2</a> | <a onclick="setSize(3)">3</a> | <a onclick="setSize(5)">5</a> | <a onclick="setSize(10)">10</a> | <a onclick="setSize(20)">20</a> | <a onclick="setSize(30)">30</a>
+        </p>
+        <p>
+          <a onclick="wipeCanvas()">clear canvas</a>
+        </p>
+      </div>
+    </main>
+    <footer class="row">
+      <div class="pull-left">
+        <a href="//github.com/jaames/pd-usb">pd-usb</a> | <a href="//github.com/jaames/pd-usb/blob/main/examples/example-send-bitmap.html">page source</a>
+      </div>
+      <div class="pull-right">
+        built by <a href="//github.com/jaames">jaames</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    var device;
+    
+    // Check WebSerial support, display error if not supported
+    try {
+      pdusb.assertUsbSupported();
+    }
+    catch (e) {
+      document.getElementById('serial').innerHTML = e.message;
+      document.getElementById('connectButton').disabled = true;
+    }
+
+    async function connect() {
+      try {
+        device = await pdusb.requestConnectPlaydate();
+        
+        if (device == null)
+          throw new Error('Could not find playdate')
+          
+        await device.open();
+        const serial = await device.getSerial();
+        
+        document.getElementById('serial').innerHTML = `Connected to Playdate ${ serial }`;
+        document.getElementById('sendButton').disabled = false;
+
+        device.on('disconnect', () => {
+          document.getElementById('serial').innerHTML = 'Playdate disconnected';
+          document.getElementById('sendButton').disabled = true;
+        });
+      }
+      catch(e) {
+        console.warn(e.message);
+        document.getElementById('serial').innerHTML = 'Error connecting to Playdate, try again';
+      }
+    }
+
+    async function sendBitmap() {
+      await device.sendBitmapIndexed(bitmap);
+    }
+
+    const w = pdusb.PLAYDATE_WIDTH;
+    const h = pdusb.PLAYDATE_HEIGHT;
+    const bitmap = new Uint8Array(w * h).fill(1);
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = w;
+    canvas.height = h;
+
+    const imgData = ctx.createImageData(w, h);
+    const rgbaBuffer = new Uint32Array(imgData.data.buffer);
+
+    let brushSize = 2;
+    let color = 0;
+    let lastPoint = [-1, -1];
+
+    function setColor(c) {
+      color = c;
+    }
+
+    function setSize(s) {
+      brushSize = s;
+    }
+
+    function wipeCanvas() {
+      console.log('clear');
+      bitmap.fill(1);
+      updateCanvas();
+    }
+
+    // set a bitmap pixel at x,y to value
+    function set(x, y, value) {
+      if (x >= 0 && y >= 0 && x < w && y < h) // check that x,y lands within the bitmap
+        bitmap[(y * w) + x] = value;
+    }
+
+    // draw a 2x2 square at x,y using color
+    function drawPoint(x, y) {
+      if (brushSize === 1) {
+        set(x, y, color);
+      }
+      else if (brushSize === 2) {
+        set(x    , y    , color);
+        set(x + 1, y    , color);
+        set(x    , y + 1, color);
+        set(x + 1, y + 1, color);
+      }
+      else {
+        const x0 = Math.floor(x - (brushSize / 2));
+        const y0 = Math.floor(y - (brushSize / 2));
+        for (let _y = 0; _y < brushSize; _y++) {
+          for (let _x = 0; _x < brushSize; _x++) {
+            set(x0 + _x, y0 + _y, color);
+          }
+        }
+      }
+    }
+
+    // draw a pixel-perfect line from x0,y0 to x1,y1 using bresenham's line algorithm
+    // https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+    function drawLine(x0, y0, x1, y1) {
+      const distX = Math.abs(x1 - x0);
+      const distY = Math.abs(y1 - y0);
+      const stepX = (x0 < x1) ? 1 : -1;
+      const stepY = (y0 < y1) ? 1 : -1;
+      let err = distX - distY;
+      let e2 = 0;
+      while (true) {
+        drawPoint(x0, y0);
+        if (x0 === x1 && y0 === y1)
+          break;
+        e2 = 2 * err;
+        if (e2 > -distY) {
+          err -= distY;
+          x0 += stepX;
+        }
+        if (e2 < distX) {
+          err += distX;
+          y0 += stepY;
+        }
+      }
+    }
+
+    function updateCanvas() {
+      const palette = [0xff000000, 0xffffffff];
+      for (let i = 0; i < bitmap.length; i++) {
+        rgbaBuffer[i] = palette[bitmap[i]];
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    function getEventCoords(e) {
+      const x = e.clientX;
+      const y = e.clientY;
+      const bounds = canvas.getBoundingClientRect();
+      return [Math.floor(x - bounds.left), Math.floor(y - bounds.top)];
+    }
+
+    function handleMouseDown(e) {
+      const [x, y] = getEventCoords(e);
+      drawPoint(x, y);
+      updateCanvas();
+      lastPoint = [x, y];
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    function handleMouseMove(e) {
+      const [x, y] = getEventCoords(e);
+      const [lastX, lastY] = lastPoint;
+      drawLine(lastX, lastY, x, y);
+      updateCanvas();
+      lastPoint = [x, y];
+    }
+
+    function handleMouseUp(e) {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    updateCanvas();
+    canvas.addEventListener('mousedown', handleMouseDown);
+
+  </script>
+</body>
+</html>
