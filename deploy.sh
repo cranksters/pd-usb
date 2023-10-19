@@ -21,6 +21,6 @@ cd www
 git init
 git add -A
 git commit -m 'deploy github pages'
-git push -f git@github.com:jaames/pd-usb master:gh-pages
+git push -f git@github.com:cranksters/pd-usb master:gh-pages
 
 cd -

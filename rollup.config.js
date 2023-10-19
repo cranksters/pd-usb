@@ -17,7 +17,7 @@ const isProdBuild = build === 'production';
 const banner = `/*!!
 pd-usb v${ version }
 JavaScript library for interacting with a Panic Playdate console over USB
-https://github.com/jaames/pd-usb
+https://github.com/cranksters/pd-usb
 2022 James Daniel
 Playdate is (c) Panic Inc. - this project isn't affiliated with or endorsed by them in any way
 */`;

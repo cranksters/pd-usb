@@ -49,11 +49,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jaames/pd-usb.git"
+    "url": "git+https://github.com/cranksters/pd-usb.git"
   },
   "author": "James Daniel <npm@jamesdaniel.dev>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/jaames/pd-usb/issues"
+    "url": "https://github.com/cranksters/pd-usb/issues"
   }
 }
