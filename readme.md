@@ -16,11 +16,11 @@ JavaScript library for interacting with a [Panic Playdate](http://play.date/) co
 
 ## Examples
 
- - [Basic Connection](https://jaames.github.io/pd-usb/example-basic.html)
- - [Input State Capture](https://jaames.github.io/pd-usb/example-controller.html)
- - [Screenshot Capture](https://jaames.github.io/pd-usb/example-screen.html)
- - [Send Bitmap](https://jaames.github.io/pd-usb/example-send-bitmap.html)
- - [Execute Lua Payload](https://jaames.github.io/pd-usb/example-eval.html)
+ - [Basic Connection](https://cranksters.github.io/pd-usb/example-basic.html)
+ - [Input State Capture](https://cranksters.github.io/pd-usb/example-controller.html)
+ - [Screenshot Capture](https://cranksters.github.io/pd-usb/example-screen.html)
+ - [Send Bitmap](https://cranksters.github.io/pd-usb/example-send-bitmap.html)
+ - [Execute Lua Payload](https://cranksters.github.io/pd-usb/example-eval.html)
 
 ## Installation
 
@@ -195,7 +195,7 @@ Capture a screenshot from the Playdate, and get the unpacked framebuffer. This w
 const screenPixels = await device.getScreenIndexed();
 ```
 
-If you want to draw the screen to a HTML5 canvas, check out the [screen example](https://github.com/jaames/pd-usb/blob/main/examples/example-screen.html).
+If you want to draw the screen to a HTML5 canvas, check out the [screen example](https://github.com/cranksters/pd-usb/blob/main/examples/example-screen.html).
 
 #### `sendBitmap`
 
@@ -221,7 +221,7 @@ const pixels = new Uint8Array(400 * 240);
 await device.sendBitmapIndexed(pixels);
 ```
 
-If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap example](https://github.com/jaames/pd-usb/blob/main/examples/example-bitmap.html).
+If you want to creating a bitmap using a HTML5 canvas, check out the [bitmap example](https://github.com/cranksters/pd-usb/blob/main/examples/example-bitmap.html).
 
 #### `run`
 
@@ -318,7 +318,7 @@ Contributions and ports to other languages are welcome! Here's a list of things 
 
 ### USB Docs
 
-If you're looking for reference, I've documented the Playdate's USB protocol and some of the more interesting commands over on my [playdate-reverse-engineering](https://github.com/jaames/playdate-reverse-engineering/blob/main/usb/usb.md) repo.
+If you're looking for reference, I've documented the Playdate's USB protocol and some of the more interesting commands over on my [playdate-reverse-engineering](https://github.com/cranksters/playdate-reverse-engineering/blob/main/usb/usb.md) repo.
 
 ### Setup
 
@@ -335,6 +335,6 @@ To build the project, you'll need to have Node and NPM installed. Clone the repo
 
 2021 James Daniel
 
-If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rakujira)), on Discord (`@jaames#9860`), or via email (`mail at jamesdaniel dot dev`).
+If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rkgkjr)), on Discord (`@rkgkjr`), or via email (`mail at jamesdaniel dot dev`).
 
 Playdate is © [Panic Inc.](https://panic.com/) This project isn't affiliated with or endorsed by them in any way
