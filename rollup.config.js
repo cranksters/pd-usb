@@ -3,7 +3,7 @@ import alias from '@rollup/plugin-alias';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
-import typescript from 'rollup-plugin-typescript2';
+import typescript from '@rollup/plugin-typescript';
 import { terser } from 'rollup-plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
@@ -18,7 +18,7 @@ const banner = `/*!!
 pd-usb v${ version }
 JavaScript library for interacting with a Panic Playdate console over USB
 https://github.com/cranksters/pd-usb
-2022 James Daniel
+2022-2024 James Daniel
 Playdate is (c) Panic Inc. - this project isn't affiliated with or endorsed by them in any way
 */`;
 
@@ -63,19 +63,16 @@ module.exports = {
       'Reflect.decorate': 'undefined'
     }),
     typescript({
-      abortOnError: false,
-      typescript: require('typescript'),
-      tsconfigOverride: {
-        compilerOptions: {
-          target: (() => {
-            if (isEsmoduleBuild)
-              return 'es2020';
-            else
-              return 'es6';
-          })(),
-          declaration: !devserver ? true : false,
-          sourceMap: devserver ? true : false,
-        },
+      outputToFilesystem: true,
+      compilerOptions: {
+        target: (() => {
+          if (isEsmoduleBuild)
+            return 'es2020';
+          else
+            return 'es6';
+        })(),
+        declaration: !devserver ? true : false,
+        sourceMap: devserver ? true : false,
       },
     }),
     bundleSize(),

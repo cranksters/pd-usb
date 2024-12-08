@@ -335,6 +335,6 @@ To build the project, you'll need to have Node and NPM installed. Clone the repo
 
 2021 James Daniel
 
-If you have any questions or just want to say hi, you can reach me on Twitter ([@rakujira](https://twitter.com/rkgkjr)), on Discord (`@rkgkjr`), or via email (`mail at jamesdaniel dot dev`).
+If you have any questions or just want to say hi, you can reach me on Bluesky ([@jaames.co.uk](https://bsky.app/profile/jaames.co.uk)), on Discord (`jaames__`), or via email (`mail at jamesdaniel dot dev`).
 
 Playdate is © [Panic Inc.](https://panic.com/) This project isn't affiliated with or endorsed by them in any way

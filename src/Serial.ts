@@ -89,7 +89,7 @@ export class PDSerial {
     try {
       this.readTransformer.setMode(PDSerialMode.Bytes);
       this.readTransformer.bytesTarget = numBytes;
-      const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<Uint8Array>;
+      const { value } = await this.reader.read() as ReadableStreamReadResult<Uint8Array>;
       this.readTransformer.bytesTarget = 0;
       this.isReading = false;
       return value;
@@ -119,7 +119,7 @@ export class PDSerial {
     this.isReading = true;
     try {
       this.readTransformer.setMode(PDSerialMode.Lines);
-      const { value } = await this.reader.read() as ReadableStreamDefaultReadResult<string>;
+      const { value } = await this.reader.read() as ReadableStreamReadResult<string>;
       this.isReading = false;
       return value;
     }
