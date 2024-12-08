@@ -9,6 +9,7 @@ export interface PDVersion {
   pdxVersion: string;
   serial: string;
   target: string;
+  pcbVer: string;
 };
 
 /**

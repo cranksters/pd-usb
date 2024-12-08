@@ -187,6 +187,7 @@ export class PlaydateDevice {
     assert('pdxversion' in parsed);
     assert('serial#' in parsed);
     assert('target' in parsed);
+    assert('pcbver' in parsed);
     // format keys as an object
     return {
       sdk: parsed['SDK'],
@@ -196,6 +197,7 @@ export class PlaydateDevice {
       pdxVersion: parsed['pdxversion'],
       serial: parsed['serial#'],
       target: parsed['target'],
+      pcbVer: parsed['pcbver'],
     };
   }
 
